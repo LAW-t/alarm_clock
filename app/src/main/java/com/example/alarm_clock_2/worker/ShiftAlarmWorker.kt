@@ -30,6 +30,7 @@ class ShiftAlarmWorker(
         fun alarmRepository(): AlarmRepository
         fun settingsDataStore(): SettingsDataStore
         fun alarmScheduler(): AlarmScheduler
+        fun holidayRepository(): com.example.alarm_clock_2.data.HolidayRepository
     }
 
     private val entry: Entry by lazy {
@@ -42,6 +43,7 @@ class ShiftAlarmWorker(
     private val repo: AlarmRepository by lazy { entry.alarmRepository() }
     private val settings: SettingsDataStore by lazy { entry.settingsDataStore() }
     private val scheduler: AlarmScheduler by lazy { entry.alarmScheduler() }
+    private val holidayRepo by lazy { entry.holidayRepository() }
 
     override suspend fun doWork(): Result {
         return try {
@@ -69,7 +71,14 @@ class ShiftAlarmWorker(
         val baseDate = runCatching { LocalDate.parse(baseDateStr) }.getOrElse { LocalDate.now() }
         val config = ShiftConfig(identity, baseDate, baseIndex)
 
-        val todayShift = ShiftCalculator.calculate(LocalDate.now(), config)
+        var todayShift = ShiftCalculator.calculate(LocalDate.now(), config)
+
+        // 若开启“节假日休息”且今天为法定休息日，则强制休息
+        val holidayRestEnabled = settings.holidayRestFlow.first()
+        if (holidayRestEnabled) {
+            val isOff = holidayRepo.isOffDay(LocalDate.now().toString())
+            if (isOff) todayShift = Shift.OFF
+        }
 
         // 2. 更新闹钟表
         val alarms = repo.getAlarms().first()

@@ -38,11 +38,16 @@ class AlarmService : Service() {
     }
     private var ringtone: Ringtone? = null
     private var toneGen: ToneGenerator? = null
-    private var prevVolume: Int? = null
+    private var prevAlarmVolume: Int? = null
+    private var prevMusicVolume: Int? = null
+    private var prevRingVolume: Int? = null
+    private var prevRingerMode: Int? = null
+    private var prevInterruptionFilter: Int? = null
     private lateinit var audioManager: AudioManager
     private var vibrator: Vibrator? = null
     private var playMode: AlarmPlayMode = AlarmPlayMode.SOUND
     private var ringtoneUriStr: String = ""
+    private lateinit var notificationManager: NotificationManager
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -57,6 +62,7 @@ class AlarmService : Service() {
     override fun onCreate() {
         super.onCreate()
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
+        notificationManager = getSystemService(NotificationManager::class.java)
         vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
         createChannel()
 
@@ -116,12 +122,36 @@ class AlarmService : Service() {
             }
             try {
                 rt.play()
-                // 提升闹钟音量到最大
-                prevVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
-                val maxVol = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
-                if (prevVolume != maxVol) {
-                    audioManager.setStreamVolume(AudioManager.STREAM_ALARM, maxVol, 0)
+
+                // === 处理静音 / 勿扰模式 ===
+                // 记录当前铃声模式
+                prevRingerMode = audioManager.ringerMode
+                if (audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL) {
+                    audioManager.ringerMode = AudioManager.RINGER_MODE_NORMAL
                 }
+
+                // 若拥有勿扰策略权限，则记录并放开全部拦截
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
+                    notificationManager.isNotificationPolicyAccessGranted
+                ) {
+                    prevInterruptionFilter = notificationManager.interruptionFilter
+                    if (prevInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) {
+                        notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
+                    }
+                }
+
+                // 记录并将三大相关流（ALARM/MUSIC/RING）提升至最大，确保外放足够响
+                val alarmMax = audioManager.getStreamMaxVolume(AudioManager.STREAM_ALARM)
+                val musicMax = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                val ringMax = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING)
+
+                prevAlarmVolume = audioManager.getStreamVolume(AudioManager.STREAM_ALARM)
+                prevMusicVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                prevRingVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING)
+
+                audioManager.setStreamVolume(AudioManager.STREAM_ALARM, alarmMax, 0)
+                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, musicMax, 0)
+                audioManager.setStreamVolume(AudioManager.STREAM_RING, ringMax, 0)
 
                 // 若启动后依旧未播放，则立即使用 ToneGenerator 兜底
                 GlobalScope.launch {
@@ -154,7 +184,12 @@ class AlarmService : Service() {
         toneGen?.release()
         vibrator?.cancel()
         // 恢复原闹钟音量
-        prevVolume?.let { audioManager.setStreamVolume(AudioManager.STREAM_ALARM, it, 0) }
+        prevAlarmVolume?.let { audioManager.setStreamVolume(AudioManager.STREAM_ALARM, it, 0) }
+        prevMusicVolume?.let { audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, it, 0) }
+        prevRingVolume?.let { audioManager.setStreamVolume(AudioManager.STREAM_RING, it, 0) }
+        // 恢复铃声模式和勿扰策略
+        prevRingerMode?.let { audioManager.ringerMode = it }
+        prevInterruptionFilter?.let { notificationManager.setInterruptionFilter(it) }
         super.onDestroy()
     }
 
