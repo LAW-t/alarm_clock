@@ -44,7 +44,7 @@ import androidx.compose.ui.window.Dialog
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
-    val isLoading by viewModel.isLoading.collectAsState()
+    // 首次安装时节假日数据在后台加载，去掉阻塞式 Dialog
 
     val baseMonth = remember { java.time.YearMonth.now() }
     val totalPages = 240 // ±10 years window
@@ -136,23 +136,6 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             }
         ) {
             DatePicker(state = datePickerState)
-        }
-    }
-
-    // ----- First-time loading dialog -----
-    if (isLoading) {
-        Dialog(onDismissRequest = {}) {
-            Column(
-                modifier = Modifier
-                    .padding(24.dp)
-                    .background(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium)
-                    .padding(horizontal = 32.dp, vertical = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(text = "正在加载节假日数据…")
-            }
         }
     }
 }
@@ -269,7 +252,7 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
     // Trigger recomposition when holiday table updated
     val holidayVer by viewModel.holidayVersion.collectAsState()
 
-    val days by produceState<List<CalendarViewModel.DayInfo>>(initialValue = emptyList(), month, holidayVer) {
+    val days by produceState<List<CalendarViewModel.DayInfo>>(initialValue = viewModel.peekMonthDays(month), month, holidayVer) {
         value = viewModel.getMonthDays(month)
     }
 

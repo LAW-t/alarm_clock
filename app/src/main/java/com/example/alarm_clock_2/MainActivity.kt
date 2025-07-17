@@ -48,12 +48,16 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.navigation.compose.navigation
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Calendar : Screen("calendar", "日历", Icons.Default.DateRange)
     object Alarms : Screen("alarms", "闹钟", Icons.Default.Alarm)
     object Settings : Screen("settings", "设置", Icons.Default.Settings)
 }
+
+// 单一 NavGraph 的字符串常量，便于多处复用
+private const val MAIN_GRAPH_ROUTE = "main_graph"
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -96,10 +100,27 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
                     // Developer info dialog moved to Settings screen
                     Surface(modifier = Modifier.padding(innerPadding), color = MaterialTheme.colorScheme.background) {
-                        NavHost(navController, startDestination = Screen.Calendar.route) {
-                            composable(Screen.Calendar.route) { CalendarScreen() }
-                            composable(Screen.Alarms.route) { AlarmsScreen() }
-                            composable(Screen.Settings.route) { SettingsScreen() }
+                        NavHost(
+                            navController = navController,
+                            startDestination = MAIN_GRAPH_ROUTE
+                        ) {
+                            navigation(
+                                startDestination = Screen.Calendar.route,
+                                route = MAIN_GRAPH_ROUTE
+                            ) {
+                                composable(Screen.Calendar.route) { backStackEntry ->
+                                    // 使用图级别的 ViewModelStoreOwner，确保 CalendarViewModel 长驻
+                                    val parentEntry = remember(backStackEntry) {
+                                        navController.getBackStackEntry(MAIN_GRAPH_ROUTE)
+                                    }
+                                    val viewModel: com.example.alarm_clock_2.ui.CalendarViewModel =
+                                        androidx.hilt.navigation.compose.hiltViewModel(parentEntry)
+                                    CalendarScreen(viewModel)
+                                }
+
+                                composable(Screen.Alarms.route) { AlarmsScreen() }
+                                composable(Screen.Settings.route) { SettingsScreen() }
+                            }
                         }
                     }
                 }

@@ -21,28 +21,18 @@ class CalendarViewModel @Inject constructor(
         // 首次进入应用时，如果节假日数据尚未加载，则触发同步并在期间显示加载弹窗
         viewModelScope.launch {
             val holidaysLoaded = settingsDataStore.holidayLoadedFlow.first()
-            val year = LocalDate.now().year
+            val nowYear = LocalDate.now().year
+            val yearRange = (nowYear - 10)..(nowYear + 10)
 
             if (!holidaysLoaded) {
-                _isLoading.value = true
-                val startTime = kotlin.system.measureTimeMillis {
-                    runCatching {
-                        holidayRepository.syncYear(year)
-                        holidayRepository.syncYear(year + 1)
-                    }.onSuccess {
-                        settingsDataStore.setHolidayLoaded(true)
-                    }
+                // 首次安装：后台逐年下载，完成后写入标记
+                yearRange.forEach { y ->
+                    runCatching { holidayRepository.syncYear(y) }
                 }
-
-                // 确保至少展示 800ms
-                if (startTime < 800) {
-                    kotlinx.coroutines.delay(800 - startTime)
-                }
-                _isLoading.value = false
+                settingsDataStore.setHolidayLoaded(true)
             } else {
-                // 数据已加载，只保证 repository 不重复下载
-                holidayRepository.ensureYear(year)
-                holidayRepository.ensureYear(year + 1)
+                // 后续启动：确保内存标记即可，无网络消耗
+                yearRange.forEach { y -> holidayRepository.ensureYear(y) }
             }
         }
     }
@@ -50,9 +40,10 @@ class CalendarViewModel @Inject constructor(
     private val _currentMonth = MutableStateFlow(YearMonth.now())
     val currentMonth: StateFlow<YearMonth> = _currentMonth
 
-    /** Loading flag for first-time holiday data fetching */
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
+    // 首次加载节假日改为后台异步，无需 UI 显示加载对话框
+
+    /** In-memory cache to avoid recomputing days for months already visited during current app session */
+    private val monthCache = mutableMapOf<YearMonth, List<DayInfo>>()
 
     data class DayInfo(
         val date: LocalDate,
@@ -174,8 +165,13 @@ class CalendarViewModel @Inject constructor(
         emptyList()
     )
 
+    /** Return cached calendar if available without suspension; empty list otherwise */
+    fun peekMonthDays(month: YearMonth): List<DayInfo> = monthCache[month] ?: emptyList()
+
     /** Public helper */
     suspend fun getMonthDays(month: YearMonth): List<DayInfo> {
+        monthCache[month]?.let { return it }
+
         val identityStr = settingsDataStore.identityFlow.first()
         val identity = identityStrToEnum(identityStr)
         val holidayRest = settingsDataStore.holidayRestFlow.first()
@@ -196,12 +192,30 @@ class CalendarViewModel @Inject constructor(
             else -> 0
         }
 
-        // 确保当前月及下一年数据已同步（避免跨年缺失）
-        runCatching {
-            holidayRepository.ensureYear(month.year)
-            holidayRepository.ensureYear(month.year + 1)
+        // 确保节假日数据就绪（若用户跳到未来/过去年份）
+        // 异步触发节假日下载，不阻塞班次计算
+        viewModelScope.launch {
+            runCatching {
+                holidayRepository.ensureYear(month.year)
+                holidayRepository.ensureYear(month.year + 1)
+            }
         }
 
+        // 在后台线程计算，避免阻塞主线程
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            computeMonthInternal(month, identity, holidayRest, baseDate, baseIndex)
+        }.also { result ->
+            monthCache[month] = result
+        }
+    }
+
+    private suspend fun computeMonthInternal(
+        month: YearMonth,
+        identity: IdentityType,
+        holidayRest: Boolean,
+        baseDate: LocalDate,
+        baseIndex: Int
+    ): List<DayInfo> {
         val holidayMap = holidayRepository.holidaysFlow.first().associateBy { it.date }
         return generateMonthDays(month, identity, holidayRest, baseDate, baseIndex, holidayMap)
     }
