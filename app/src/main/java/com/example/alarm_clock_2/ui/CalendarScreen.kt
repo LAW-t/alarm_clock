@@ -187,16 +187,20 @@ private fun DayCell(day: CalendarViewModel.DayInfo, cellHeight: androidx.compose
     val today = java.time.LocalDate.now()
     val isToday = day.date == today
 
+    val clickModifier = remember(day.date) {
+        Modifier.combinedClickable(onClick = {
+            day.holidayName?.let { name ->
+                android.widget.Toast.makeText(context, name, android.widget.Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
     Column(
         modifier = Modifier
             .height(cellHeight)
             .padding(4.dp)
             // 不再高亮节假日
-            .combinedClickable(onClick = {
-                day.holidayName?.let { name ->
-                    android.widget.Toast.makeText(context, name, android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }),
+            .then(clickModifier),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -266,7 +270,7 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(4.dp)
         ) {
-            items(days) { day ->
+            items(days, key = { it.date }) { day ->
                 DayCell(day = day, cellHeight = cellHeight)
             }
         }

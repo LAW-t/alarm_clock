@@ -57,8 +57,7 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
                 .padding(innerPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            items(merged.size) { index ->
-                val temp = merged[index]
+            items(items = merged, key = { it.code }) { temp ->
                 AlarmRow(
                     alarm = temp.entity,
                     label = labelMap[temp.code] ?: temp.code,
@@ -125,10 +124,14 @@ private fun AlarmRow(
         )
     }
 
+    val clickModifier = remember {
+        Modifier.clickable { showPicker = true }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { showPicker = true }
+            .then(clickModifier)
             .padding(horizontal = 16.dp, vertical = 2.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
