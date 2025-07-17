@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>班次闹钟设置</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+  <!-- Material Icons for bottom navigation icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet" />
+  <!-- 你可以将样式拆分到单独的 CSS 文件，这里为演示方便直接写在页面中 -->
+  <script src="https://cdn.jsdelivr.net/npm/solarlunar@1.1.5/lib/solarlunar.min.js"></script>
+  <style>
+    :root {
+      /* Modern, refined color palette */
+      --primary: #4f46e5; /* indigo-600 */
+      --primary-light: #c7d2fe; /* indigo-300 */
+      --primary-lighter: #eef2ff; /* indigo-50 */
+      --text-on-primary: #ffffff;
+
+      --danger: #dc2626; /* red-600 */
+      --success: #059669; /* emerald-600 */
+      --warning: #f59e0b; /* amber-500 */
+      --info: #3b82f6; /* blue-500 */
+
+      --bg-base: #f8fafc;   /* slate-50 */
+      --bg-surface: #ffffff;
+      
+      --text-main: #1e293b; /* slate-800 */
+      --text-muted: #64748b; /* slate-500 */
+      --text-faint: #94a3b8; /* slate-400 */
+
+      --border-color: #e2e8f0; /* slate-200 */
+      --border-color-light: #f1f5f9; /* slate-100 */
+
+      /* Consistent shadows */
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: "Poppins", "Noto Sans SC", sans-serif;
+    }
+
+    body {
+      background: var(--bg-base);
+      padding: 20px;
+      color: var(--text-main);
+      padding-bottom: 72px; /* space for bottom nav */
+    }
+
+    h1 {
+      margin-bottom: 2rem;
+      text-align: center;
+      color: var(--text-main);
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: var(--bg-surface);
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      padding: 24px;
+    }
+
+    section {
+      margin-bottom: 2rem;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* 身份选择 */
+    .identity-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .identity-options label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-base);
+      padding: 8px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+      border: 1px solid var(--border-color);
+      user-select: none;
+    }
+
+    .identity-options label:hover {
+      border-color: var(--primary);
+    }
+
+    /* 选中状态（支持现代浏览器）*/
+    .identity-options label:has(input:checked) {
+      background: var(--primary);
+      color: var(--text-on-primary);
+      border-color: var(--primary);
+    }
+
+    /* 隐藏原生 radio 视觉，仅保留可访问性 */
+    .identity-options input[type="radio"] {
+      accent-color: var(--primary);
+      width: 0;
+      height: 0;
+      position: absolute;
+      opacity: 0;
+    }
+
+    /* 闹钟时间面板 */
+    .alarm-settings {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .alarm-settings.visible {
+      display: flex;
+    }
+
+    .alarm-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .alarm-row input[type="time"] {
+      /* 美化时间选择器 */
+      padding: 6px 12px;
+      width: 120px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+    }
+    .alarm-row input[type="time"]:hover {
+      border-color: var(--primary-light);
+    }
+    .alarm-row input[type="time"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-lighter);
+    }
+    .alarm-row input[type="time"]::-webkit-calendar-picker-indicator {
+      color: var(--primary);
+    }
+
+    /* 节假日选项 */
+    .holiday-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .holiday-toggle input[type="checkbox"] {
+      appearance: none;
+      width: 42px;
+      height: 24px;
+      background: var(--border-color);
+      border-radius: 9999px;
+      position: relative;
+      transition: background 0.3s ease;
+      cursor: pointer;
+    }
+
+    .holiday-toggle input[type="checkbox"]::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.3s ease;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .holiday-toggle input[type="checkbox"]:checked {
+      background: var(--success);
+    }
+
+    .holiday-toggle input[type="checkbox"]:checked::before {
+      transform: translateX(18px);
+    }
+
+    /* 日历 */
+    .calendar {
+      overflow-x: auto;
+      -ms-overflow-style: none; /* IE and Edge */
+      scrollbar-width: none; /* Firefox */
+    }
+    .calendar::-webkit-scrollbar {
+      display: none; /* Chrome, Safari, Opera */
+    }
+
+
+    .calendar-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 4px;
+      text-align: center;
+    }
+    .calendar-table th,
+    .calendar-table td {
+      border: none;
+      padding: 8px 4px;
+      min-width: 100px;
+      position: relative;
+    }
+
+    .calendar-table th {
+      background: transparent;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .calendar-table td {
+      background: var(--bg-surface);
+      border-radius: 8px;
+      transition: background 0.2s ease;
+    }
+
+    .calendar-table td:hover {
+      background: var(--primary-lighter);
+    }
+
+    .shift-tag {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      color: var(--text-on-primary);
+    }
+
+    .tag-early {
+      background: var(--info);
+    }
+    .tag-middle {
+      background: var(--success);
+    }
+    .tag-late {
+      background: var(--warning);
+    }
+    .tag-off {
+      background: var(--text-faint);
+    }
+    .tag-work {
+      background: var(--primary);
+    }
+    .tag-holiday {
+      background: #f43f5e; /* rose-500 */
+    }
+
+    /* 触发器 */
+    button.save-btn {
+      margin-top: 16px;
+      padding: 10px 20px;
+      background: var(--primary);
+      color: var(--text-on-primary);
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: filter 0.2s ease;
+      box-shadow: var(--shadow);
+    }
+    button.save-btn:hover {
+      filter: brightness(1.05);
+    }
+
+    /* ===== Tabs & Views ===== */
+    .tabs {
+      display: flex;
+      max-width: 1000px;
+      margin: 0 auto 1rem;
+      background: var(--bg-surface);
+      border-radius: 12px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+    }
+    .tab-item {
+      flex: 1;
+      padding: 12px 0;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text-muted); /* slate-500 */
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .tab-item:hover {
+      background: var(--primary-lighter);
+    }
+    .tab-item.active {
+      background: transparent;
+      color: var(--primary);
+    }
+
+    .view {
+      display: none;
+    }
+    .view.active {
+      display: block;
+    }
+
+    /* Alarm list */
+    .alarm-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .alarm-item {
+      background: var(--bg-surface);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border: 1px solid var(--border-color-light);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      cursor: pointer; /* 整行可点击 */
+      -webkit-tap-highlight-color: transparent; /* 取消 iOS 点击闪烁 */
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .alarm-item:active {
+      background: var(--bg-base);
+      transform: scale(0.98);
+    }
+    .alarm-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .alarm-time {
+      font-size: 1.8rem;
+      font-weight: 600;
+      line-height: 1;
+      color: var(--text-main);
+    }
+    .alarm-label {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .alarm-desc {
+      font-size: 0.75rem;
+      color: var(--text-faint);
+    }
+
+    /* --- Toggle Switch (reuse holiday style) --- */
+    .alarm-item .switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      cursor: default; /* 开关本身保持默认光标 */
+    }
+    .alarm-item .switch input {
+      appearance: none;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .alarm-item .slider {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--border-color);
+      border-radius: 9999px;
+      transition: background 0.3s ease;
+    }
+    .alarm-item .slider::before {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.3s ease;
+      box-shadow: var(--shadow-sm);
+    }
+    .alarm-item .switch input:checked + .slider {
+      background: var(--primary);
+    }
+    .alarm-item .switch input:checked + .slider::before {
+      transform: translateX(20px);
+    }
+
+    /* Calendar header / picker */
+    .calendar-header {
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .month-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .calendar-icons {
+      display: flex;
+      gap: 12px;
+    }
+    .calendar-icons .material-icons-outlined {
+      font-size: 24px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .calendar-icons .material-icons-outlined:hover {
+      color: var(--text-main);
+    }
+
+    /* Cell structure */
+    .calendar-table td {
+      padding: 0;
+      border: none;
+      height: 72px;
+      vertical-align: top;
+    }
+    .cell-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      width: 100%;
+      height: 100%;
+      padding-top: 4px;
+    }
+    .date-num {
+      /* 统一日期数字外观：圆形居中 */
+      font-weight: 600;
+      font-size: 0.9rem;
+      line-height: 1;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .today .date-num {
+      color: var(--text-on-primary);
+      background: var(--primary);
+      box-shadow: var(--shadow-md);
+    }
+    .lunar {
+      font-size: 0.65rem;
+      color: var(--text-faint);
+      margin-top: 1px;
+    }
+    .shift-tag {
+      display: block;
+      width: 90%;
+      margin-top: 2px;
+      border-radius: 4px;
+    }
+
+    /* Today shift card */
+    .today-card {
+      margin-top: 12px;
+      background: var(--bg-surface);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .today-card .shift-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-on-primary);
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .today-card .detail {
+      flex: 1;
+    }
+    .today-card .detail .title {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .today-card .detail .time-range {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* ===== Mobile App Layout Adjustments ===== */
+    .container {
+      max-width: none;
+      margin: 0;
+      border-radius: 0;
+      box-shadow: none;
+      padding: 8px; /* Wider content */
+      background: var(--bg-base);
+    }
+
+    /* Bottom navigation */
+    .tabs {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 56px;
+      background: var(--bg-surface);
+      box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.08);
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+    }
+    .tab-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      gap: 2px;
+    }
+    .tab-item .material-icons-outlined {
+      font-size: 22px;
+    }
+
+    /* === Responsive: shrink calendar cells on small screens === */
+    @media (max-width: 600px) {
+      .calendar-table {
+        border-spacing: 2px;
+      }
+      .calendar-table th,
+      .calendar-table td {
+        min-width: auto !important;
+        width: calc(100% / 7);
+        padding: 6px 0; /* More vertical space */
+        font-size: 0.8rem; /* Larger base font */
+        border-radius: 4px;
+      }
+
+      .shift-tag {
+        font-size: 0.7rem; /* Larger font */
+        padding: 1px 4px;
+      }
+      .cell-wrap {
+        padding-top: 2px;
+      }
+      .date-num {
+        width: 22px; /* Larger circle */
+        height: 22px; /* Larger circle */
+        font-size: 0.85rem; /* Larger font */
+      }
+      .lunar {
+        font-size: 0.7rem; /* Larger font */
+      }
+    }
+
+    #alarm-section { /* 隐藏设置页中的时间设置面板 */
+      display: none;
+    }
+
+    /* 替换大号时间文本为可编辑 time 输入 */
+    .alarm-time-input {
+      font-size: 1.8rem;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      width: 100px;
+      color: var(--text-main);
+      line-height: 1;
+    }
+    .alarm-time-input:focus { outline: none; }
+    .alarm-time-input::-webkit-calendar-picker-indicator { opacity: 0; }
+
+    #save-btn{display:none;}
+
+    /* ================= Time Modal (iOS-style bottom sheet) ================= */
+    #time-modal{
+      display:none;
+      position:fixed;
+      inset:0;
+      z-index:50;
+    }
+    #time-modal.show{display:block;}
+    #time-modal .time-modal-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(0,0,0,0.4);
+      -webkit-backdrop-filter: blur(2px);
+      backdrop-filter: blur(2px);
+    }
+    #time-modal .time-modal-sheet{
+      position:absolute;
+      bottom:-300px;
+      left:0;
+      width:100%;
+      background:#fff;
+      border-top-left-radius:16px;
+      border-top-right-radius:16px;
+      padding:20px 16px 32px;
+      box-shadow:var(--shadow-lg);
+      transition:bottom 0.3s ease;
+    }
+    #time-modal.show .time-modal-sheet{bottom:0;}
+    .modal-time-input{
+      width:100%;
+      font-size:1.8rem;
+      border:none;
+      margin-bottom:12px;
+    }
+    .modal-time-input:focus{outline:none;}
+    #time-modal button{
+      width:100%;
+      padding:10px 0;
+      border:none;
+      border-radius:8px;
+      font-size:1rem;
+      margin-bottom:8px;
+    }
+    #modal-confirm{background:var(--primary);color:var(--text-on-primary);}
+    #modal-cancel{background:var(--border-color);color:var(--text-muted);}
+
+    /* 修改闹钟行内输入显示宽度，并隐藏原生指示 */
+    .alarm-time-input{
+      width:120px;
+    }
+    .alarm-time-input::-webkit-calendar-picker-indicator{display:none;}
+
+    .developer-name {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .cycle-config {
+      margin-top: 12px;
+      display: none;
+      gap: 8px;
+      flex-direction: column;
+    }
+    .cycle-config select {
+      padding: 4px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      background: var(--bg-surface);
+    }
+
+    /* === Settings page cards === */
+    .settings-card {
+      background: var(--bg-surface);
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+    }
+    .settings-card .section-title {
+      margin-bottom: 12px;
+    }
+
+    /* Cycle config layout */
+    .cycle-config label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cycle-config select { flex: 1; }
+  </style>
+</head>
+<body>
+  <!-- 顶部导航 -->
+  <nav class="tabs">
+    <button class="tab-item active" data-target="calendar-view">
+      <span class="material-icons-outlined">calendar_today</span>
+      <span class="tab-label">日历</span>
+    </button>
+    <button class="tab-item" data-target="alarms-view">
+      <span class="material-icons-outlined">alarm</span>
+      <span class="tab-label">闹钟</span>
+    </button>
+    <button class="tab-item" data-target="settings-view">
+      <span class="material-icons-outlined">settings</span>
+      <span class="tab-label">设置</span>
+    </button>
+  </nav>
+
+  <div class="container">
+    <!-- View 1: Calendar -->
+    <section id="calendar-view" class="view active">
+      <div class="calendar-header">
+        <span class="month-title" id="month-title" style="cursor:pointer;">2023.09</span>
+        <input type="month" id="month-picker" style="display:none;" />
+        <div class="calendar-icons">
+          <span class="material-icons-outlined">alarm_on</span>
+        </div>
+      </div>
+      <div class="calendar" id="calendar"></div>
+      <div class="today-card" id="today-card" style="display:none;">
+        <div class="shift-dot">早</div>
+        <div class="detail">
+          <div class="title">早班</div>
+          <div class="time-range">07:00-17:00</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- View 2: Alarms -->
+    <section id="alarms-view" class="view">
+      <div class="section-title">当前启用的闹钟</div>
+      <ul class="alarm-list" id="alarm-list">
+        <li class="alarm-item">暂无闹钟，请在"设置"中保存</li>
+      </ul>
+    </section>
+
+    <!-- View 3: Settings -->
+    <section id="settings-view" class="view">
+      <!-- 身份选择 -->
+      <section id="identity-section" class="settings-card">
+        <div class="section-title">1. 选择身份</div>
+        <div class="identity-options">
+          <label>
+            <input type="radio" name="identity" value="day" checked />
+            长白班
+          </label>
+          <label>
+            <input type="radio" name="identity" value="four_three" />
+            四班三运转
+          </label>
+          <label>
+            <input type="radio" name="identity" value="four_two" />
+            四班两运转
+          </label>
+        </div>
+      </section>
+
+      <!-- 四班三运转班次选择 -->
+      <div id="four-three-config" class="cycle-config settings-card">
+        <div class="section-title">选择今天/明天班次</div>
+        <label>今天：
+          <select id="four-three-today">
+            <option value="休">休</option>
+            <option value="早">早</option>
+            <option value="中">中</option>
+            <option value="晚">晚</option>
+          </select>
+        </label>
+        <label>明天：
+          <select id="four-three-tomorrow">
+            <option value="休">休</option>
+            <option value="早">早</option>
+            <option value="中">中</option>
+            <option value="晚">晚</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- 四班两运转班次选择 -->
+      <div id="four-two-config" class="cycle-config settings-card">
+        <div class="section-title">选择今天班次</div>
+        <label>今天：
+          <select id="four-two-today">
+            <option value="早">早</option>
+            <option value="晚">晚</option>
+            <option value="休">休</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- 闹钟时间设置 -->
+      <section id="alarm-section">
+        <div class="section-title">2. 设定闹钟时间</div>
+
+        <!-- 长白班 -->
+        <div id="alarm-day" class="alarm-settings visible">
+          <div class="alarm-row">
+            <label for="day-alarm">上班闹钟：</label>
+            <input type="time" id="day-alarm" />
+          </div>
+        </div>
+
+        <!-- 四班三运转 -->
+        <div id="alarm-four-three" class="alarm-settings">
+          <div class="alarm-row">
+            <label for="early-alarm">早班闹钟：</label>
+            <input type="time" id="early-alarm" />
+          </div>
+          <div class="alarm-row">
+            <label for="middle-alarm">中班闹钟：</label>
+            <input type="time" id="middle-alarm" />
+          </div>
+          <div class="alarm-row">
+            <label for="late-alarm">晚班闹钟：</label>
+            <input type="time" id="late-alarm" />
+          </div>
+        </div>
+
+        <!-- 四班两运转 -->
+        <div id="alarm-four-two" class="alarm-settings">
+          <div class="alarm-row">
+            <label for="early-alarm-42">早班闹钟：</label>
+            <input type="time" id="early-alarm-42" />
+          </div>
+          <div class="alarm-row">
+            <label for="late-alarm-42">晚班闹钟：</label>
+            <input type="time" id="late-alarm-42" />
+          </div>
+        </div>
+      </section>
+
+      <!-- 节假日选项 -->
+      <section id="holiday-section" class="settings-card">
+        <div class="section-title">3. 法定节假日设置</div>
+        <div class="holiday-toggle">
+          <input type="checkbox" id="holiday-checkbox" />
+          <label for="holiday-checkbox">法定节假日是否休息</label>
+        </div>
+      </section>
+
+      <!-- 开发者信息 -->
+      <section id="about-section" class="settings-card" style="margin-top:0;">
+        <div class="section-title">开发者</div>
+        <p class="developer-name">YourNameHere</p>
+      </section>
+
+      <!-- 保存按钮 (已隐藏) -->
+      <button class="save-btn" id="save-btn">保存设置</button>
+    </section>
+  </div>
+
+  <!-- 时间选择模态框 -->
+  <div id="time-modal" class="time-modal">
+    <div class="time-modal-backdrop"></div>
+    <div class="time-modal-sheet">
+      <input type="time" id="modal-time-input" class="modal-time-input" />
+    </div>
+  </div>
+
+  <!-- 脚本实现交互 -->
+  <script>
+    /* -------- Tab switching -------- */
+    const tabButtons = document.querySelectorAll('.tab-item');
+    const views = document.querySelectorAll('.view');
+    tabButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        tabButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        views.forEach((v) => v.classList.remove('active'));
+        document.getElementById(btn.dataset.target).classList.add('active');
+      });
+    });
+
+    /* -------- Existing logic: 身份面板切换 -------- */
+    const identityRadios = document.querySelectorAll('input[name="identity"]');
+    const alarmPanels = {
+      day: document.getElementById('alarm-day'),
+      four_three: document.getElementById('alarm-four-three'),
+      four_two: document.getElementById('alarm-four-two'),
+    };
+
+    // 提前声明 alarmList 与 alarmTimes，供后续函数和监听器使用
+    const alarmList = document.getElementById('alarm-list');
+    const alarmTimes = {};
+
+    /* -------- Shift helper -------- */
+    const refDate = new Date(2023, 0, 1); // 参考点 四班周期起点
+
+    // 法定节假日示例，可根据年份拓展
+    const holidaySet = new Set([
+      '2023-01-01','2023-01-02','2023-01-03',
+      '2023-05-01','2023-05-02','2023-05-03','2023-05-04','2023-05-05',
+      '2023-10-01','2023-10-02','2023-10-03','2023-10-04','2023-10-05','2023-10-06','2023-10-07'
+    ]);
+
+    function formatDateKey(date){
+      return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+    }
+
+    function isLegalHoliday(date){
+      return holidaySet.has(formatDateKey(date));
+    }
+
+    function getShiftInfo(date, identity) {
+      if (identity === 'day') {
+        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+        return isWeekend ? { text: '休', cls: 'tag-off' } : { text: '班', cls: 'tag-work' };
+      }
+
+      const diffDays = Math.floor((date - new Date().setHours(0,0,0,0)) / (24 * 60 * 60 * 1000)); // 相对今天
+      if (identity === 'four_three') {
+        const cycle = cycleFourThree;
+        const clsMap = ['tag-off','tag-off','tag-early','tag-early','tag-middle','tag-middle','tag-late','tag-late'];
+        const idx = ((startIndexFourThree + diffDays)%8 + 8)%8;
+        return {text:cycle[idx],cls:clsMap[idx]};
+      }
+      if (identity === 'four_two') {
+        const cycle = cycleFourTwo;
+        const clsMap = ['tag-early','tag-late','tag-off','tag-off'];
+        const idx = ((startIndexFourTwo + diffDays)%4 +4)%4;
+        return {text:cycle[idx],cls:clsMap[idx]};
+      }
+      return { text: '休', cls: 'tag-off' };
+    }
+
+    identityRadios.forEach((radio) => {
+      radio.addEventListener('change', () => {
+        const value = radio.value;
+        Object.entries(alarmPanels).forEach(([key, panel]) => {
+          panel.classList.toggle('visible', key === value);
+        });
+        updateAlarmList();
+        // 显示对应班次配置面板
+        document.getElementById('four-three-config').style.display = value==='four_three' ? 'flex' : 'none';
+        document.getElementById('four-two-config').style.display = value==='four_two' ? 'flex' : 'none';
+
+        // 更新起始索引
+        if(value==='four_three') updateStartIndexFourThree();
+        if(value==='four_two') updateStartIndexFourTwo();
+
+        renderCalendar(currentOffset);
+      });
+    });
+
+    /* -------- 日历渲染 -------- */
+    const calendarContainer = document.getElementById('calendar');
+
+    // 初始化与滑动切换月份
+    const initDate = new Date();
+    let currentOffset = 0;
+
+    // 处理滑动（触摸 & 鼠标）
+    let startX = 0;
+    const swipeThreshold = 50; // 触发切换的最小位移（px）
+
+    const handleSwipe = (diff) => {
+      if (diff > swipeThreshold) {
+        // 右滑：上一个月
+        currentOffset--;
+        renderCalendar(currentOffset);
+      } else if (diff < -swipeThreshold) {
+        // 左滑：下一个月
+        currentOffset++;
+        renderCalendar(currentOffset);
+      }
+    };
+
+    calendarContainer.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+    });
+    calendarContainer.addEventListener('touchend', (e) => {
+      const diff = e.changedTouches[0].clientX - startX;
+      handleSwipe(diff);
+    });
+    calendarContainer.addEventListener('mousedown', (e) => {
+      startX = e.clientX;
+    });
+    calendarContainer.addEventListener('mouseup', (e) => {
+      const diff = e.clientX - startX;
+      handleSwipe(diff);
+    });
+
+    function renderCalendar(monthOffset = 0) {
+      const base = new Date();
+      base.setHours(0,0,0,0);
+      base.setMonth(base.getMonth() + monthOffset);
+      const year = base.getFullYear();
+      const month = base.getMonth();
+      // Update month title
+      document.getElementById('month-title').textContent = `${year}.${String(month+1).padStart(2,'0')}`;
+
+      const firstDayWeekIndex = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const table = document.createElement('table');
+      table.className = 'calendar-table';
+      const thead = document.createElement('thead');
+      const headRow = document.createElement('tr');
+      ['日', '一', '二', '三', '四', '五', '六'].forEach((d) => {
+        const th = document.createElement('th');
+        th.textContent = d;
+        headRow.appendChild(th);
+      });
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+      const tbody = document.createElement('tbody');
+      let currentDay = 1;
+      const today = new Date();
+      today.setHours(0,0,0,0);
+
+      const numRows = Math.ceil((firstDayWeekIndex + daysInMonth) / 7);
+      for (let i = 0; i < numRows; i++) {
+        const row = document.createElement('tr');
+        for (let j = 0; j < 7; j++) {
+          const cell = document.createElement('td');
+          if (i === 0 && j < firstDayWeekIndex) {
+            cell.innerHTML = '';
+          } else if (currentDay > daysInMonth) {
+            cell.innerHTML = '';
+          } else {
+            const cellDate = new Date(year, month, currentDay);
+            const wrap = document.createElement('div');
+            wrap.className = 'cell-wrap';
+            const identity = document.querySelector('input[name="identity"]:checked').value;
+            const shift = getShiftInfo(cellDate, identity);
+
+            // 法定节假日覆盖
+            const holidayRest = document.getElementById('holiday-checkbox').checked;
+            if (holidayRest && isLegalHoliday(cellDate)) {
+              shift.text = '休';
+              shift.cls = 'tag-holiday';
+            }
+
+            // lunar
+            let lunarStr = '--';
+            if (typeof solarlunar !== 'undefined') {
+              const lunarObj = solarlunar.solar2lunar(cellDate.getFullYear(), cellDate.getMonth()+1, cellDate.getDate());
+              lunarStr = lunarObj.term || lunarObj.lunarDayStr;
+            }
+            wrap.innerHTML = `
+              <div class="date-num">${currentDay}</div>
+              <div class="lunar">${lunarStr}</div>
+              <div class="shift-tag ${shift.cls}">${shift.text}</div>
+            `;
+            cell.appendChild(wrap);
+
+            if (cellDate.getTime() === today.getTime()) {
+              cell.classList.add('today');
+            }
+            currentDay++;
+          }
+          row.appendChild(cell);
+        }
+        tbody.appendChild(row);
+      }
+      table.appendChild(tbody);
+      calendarContainer.innerHTML = '';
+      calendarContainer.appendChild(table);
+    }
+    // 首次渲染当前月份
+    renderCalendar(currentOffset);
+
+    // 首次渲染闹钟列表
+    updateAlarmList();
+
+    /* -------- Time modal -------- */
+    const timeModal = document.getElementById('time-modal');
+    const modalInputEl = document.getElementById('modal-time-input');
+    const modalBackdrop = document.querySelector('#time-modal .time-modal-backdrop');
+    let currentEditInput = null;
+
+    const openTimeModal = (targetInput) => {
+      currentEditInput = targetInput;
+      modalInputEl.value = currentEditInput.value;
+      timeModal.classList.add('show');
+    };
+    const closeTimeModal = () => {
+      timeModal.classList.remove('show');
+      currentEditInput = null;
+    };
+
+    modalInputEl.addEventListener('input', () => {
+      if (currentEditInput) {
+        currentEditInput.value = modalInputEl.value;
+        const label = currentEditInput.parentElement.querySelector('.alarm-label').textContent;
+        alarmTimes[label] = modalInputEl.value;
+      }
+      closeTimeModal();
+    });
+    modalBackdrop.addEventListener('click', closeTimeModal);
+
+    // 代理点击事件，打开时间选择模态框
+    alarmList.addEventListener('click', (e) => {
+      // 若点击在开关或其内部则忽略
+      if (e.target.closest('.switch')) return;
+
+      const li = e.target.closest('.alarm-item');
+      if (!li) return;
+
+      const input = li.querySelector('.alarm-time-input');
+      if (input) {
+        openTimeModal(input);
+      }
+    });
+
+    /* -------- Alarm list logic -------- */
+    function updateAlarmList() {
+      const identity = document.querySelector('input[name="identity"]:checked').value;
+      alarmList.innerHTML = '';
+
+      const addItem = (time, label) => {
+        const li = document.createElement('li');
+        li.className = 'alarm-item';
+        li.innerHTML = `
+          <div class="alarm-info">
+            <input type="time" value="${time}" class="alarm-time-input" readonly />
+            <div class="alarm-label">${label}</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" checked />
+            <span class="slider"></span>
+          </label>
+        `;
+
+        // 监听时间编辑（在 modal 中完成）
+        const input = li.querySelector('.alarm-time-input');
+        input.addEventListener('change', () => {
+          alarmTimes[label] = input.value;
+        });
+
+        alarmList.appendChild(li);
+      };
+
+      switch (identity) {
+        case 'day':
+          addItem(alarmTimes['长白班'] || '', '长白班');
+          break;
+        case 'four_three':
+          addItem(alarmTimes['早班'] || '', '早班');
+          addItem(alarmTimes['中班'] || '', '中班');
+          addItem(alarmTimes['晚班'] || '', '晚班');
+          break;
+        case 'four_two':
+          addItem(alarmTimes['早班'] || '', '早班');
+          addItem(alarmTimes['晚班'] || '', '晚班');
+          break;
+      }
+    }
+
+    // === Cycle start indices (determined by user) ===
+    let startIndexFourThree = 0; // 0-7
+    let startIndexFourTwo = 0;   // 0-3
+
+    const cycleFourThree = ['休','休','早','早','中','中','晚','晚'];
+    const cycleFourTwo = ['早','晚','休','休'];
+
+    function updateStartIndexFourThree(){
+      const todayVal = document.getElementById('four-three-today').value;
+      const tomorrowVal = document.getElementById('four-three-tomorrow').value;
+      const idx = cycleFourThree.findIndex((v,i)=> v===todayVal && cycleFourThree[(i+1)%8]===tomorrowVal);
+      startIndexFourThree = idx !== -1 ? idx : 0;
+    }
+
+    function updateStartIndexFourTwo(){
+      const todayVal = document.getElementById('four-two-today').value;
+      const idx = cycleFourTwo.findIndex(v=> v===todayVal);
+      startIndexFourTwo = idx !== -1 ? idx : 0;
+    }
+
+    // Attach change listeners
+    document.getElementById('four-three-today').addEventListener('change', ()=>{updateStartIndexFourThree(); renderCalendar(currentOffset);} );
+    document.getElementById('four-three-tomorrow').addEventListener('change', ()=>{updateStartIndexFourThree(); renderCalendar(currentOffset);} );
+    document.getElementById('four-two-today').addEventListener('change', ()=>{updateStartIndexFourTwo(); renderCalendar(currentOffset);} );
+
+    // Month picker logic
+    const monthTitleEl = document.getElementById('month-title');
+    const monthPickerEl = document.getElementById('month-picker');
+
+    monthTitleEl.addEventListener('click', () => {
+      if (monthPickerEl.showPicker) {
+        monthPickerEl.showPicker();
+      } else {
+        monthPickerEl.click();
+      }
+    });
+
+    monthPickerEl.addEventListener('change', () => {
+      const [y, m] = monthPickerEl.value.split('-').map(Number);
+      const today = new Date();
+      const offset = (y - today.getFullYear()) * 12 + (m - 1 - today.getMonth());
+      currentOffset = offset;
+      renderCalendar(currentOffset);
+    });
+  </script>
+</body>
+</html> 
