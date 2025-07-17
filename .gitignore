@@ -1,0 +1,45 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+.idea/
+.cursor/
+# --- Additional ignores ---
+# Gradle build directories in any module
+**/build/
+
+# Android/Gradle generated binary artifacts
+*.apk
+*.ap_
+*.aab
+*.aar
+
+# Local signing keys (DO NOT COMMIT!)
+*.jks
+*.keystore
+
+# Debug/analysis files
+*.hprof
+output.json
+dependency-reduced-pom.xml
+
+# Logs
+*.log
+
+# Coverage reports
+coverage/
+
+# OS / Editor metadata
+Thumbs.db
+.vscode/
