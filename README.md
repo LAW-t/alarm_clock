@@ -12,8 +12,14 @@
 - 🔔 **可定制铃声**：支持本地音乐与闹钟振动模式。
 
 <table>
- <tr><td align="center">📱</td><td>专注离线 · 无广告 · 隐私友好</td></tr>
+ <tr><td align="center">📱</td><td>小巧 · 专注离线 · 无广告 · 隐私友好</td></tr>
 </table>
+
+## 📸 界面预览
+
+| 闹钟列表 | 排班日历 | 设置 |
+| --- | --- | --- |
+| ![Alarms](doc/screenshots/alarms.png) | ![Calendar](doc/screenshots/calendar.png) | ![Settings](doc/screenshots/settings.png) |
 
 ---
 
@@ -42,13 +48,28 @@ $ ./gradlew installDebug
 ## 🛠️ 项目结构
 
 ```
-app/
- ├─ alarm/                 # 闹钟核心逻辑
- ├─ data/                  # Room DAO & Repository
- ├─ shift/                 # 排班计算
- ├─ ui/                    # Jetpack Compose 界面
- ├─ worker/                # WorkManager 后台任务
- └─ ...
+.                            # 仓库根目录
+├── app/                     # Android 应用模块
+│   ├── build.gradle.kts     # 模块级 Gradle 脚本
+│   └── src/
+│       ├── main/            # 生产代码
+│       │   ├── AndroidManifest.xml
+│       │   ├── java/com/example/alarm_clock_2/
+│       │   │   ├── alarm/      # 闹钟调度、Service、Receiver
+│       │   │   ├── data/       # Room Entity、DAO、Repository
+│       │   │   ├── shift/      # 排班算法
+│       │   │   ├── ui/         # Jetpack Compose 界面层
+│       │   │   ├── worker/     # WorkManager 后台任务
+│       │   │   ├── di/         # Hilt 依赖注入模块
+│       │   │   └── util/       # 通用工具类
+│       │   └── res/            # 资源文件 (drawable、layout、values...)
+│       ├── androidTest/        # 仪器测试 (Espresso / Compose UI Test)
+│       └── test/               # JVM 单元测试
+├── doc/                       # 设计文档与发布指南
+├── gradle/                    # Gradle Wrapper 与版本锁定文件
+├── build.gradle.kts           # 根级 Gradle 脚本
+├── gradle.properties          # 构建配置属性
+└── settings.gradle.kts        # 模块与插件声明
 ```
 
 详细设计请见 [`doc/`](doc/index.html)。
