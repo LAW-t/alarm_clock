@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,8 +8,6 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
 }
-
-import java.util.Properties
 
 kotlin {
     sourceSets.all {
@@ -23,8 +23,8 @@ android {
         applicationId = "com.example.alarm_clock_2"
         minSdk = 21
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.9"
+        versionCode = 2
+        versionName = "0.9.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
