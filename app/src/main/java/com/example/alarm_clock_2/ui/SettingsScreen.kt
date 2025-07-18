@@ -26,6 +26,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.text.ClickableText
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -34,15 +35,20 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.font.FontWeight
 // BuildConfig will be referenced with full package name
 import android.widget.Toast
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val identity = viewModel.uiState.collectAsState().value
     val ui = identity
 
+    val scrollState = rememberScrollState()
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.Top
     ) {
@@ -160,6 +166,7 @@ private fun FourTwoShiftPicker(selectedIndex: Int, onSelect: (Int) -> Unit) {
 
 // 旧两日校准函数已废弃
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ShiftOptionRow(
     options: List<String>,
@@ -167,7 +174,7 @@ private fun ShiftOptionRow(
     allowed: List<String>,
     onOptionSelect: (String) -> Unit
 ) {
-    Row {
+    FlowRow {
         options.forEach { label ->
             val enabled = label in allowed
             AssistChip(
@@ -212,17 +219,21 @@ private fun RingtonePickerRow(currentUri: String, onUriSelected: (String) -> Uni
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PlayModeRadioGroup(selected: AlarmPlayMode, onSelect: (AlarmPlayMode) -> Unit) {
     Column {
         Text("播放模式")
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
             listOf(
                 AlarmPlayMode.SOUND to "仅响铃",
                 AlarmPlayMode.VIBRATE to "仅震动",
                 AlarmPlayMode.BOTH to "响铃+震动"
             ).forEach { (mode, label) ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = mode == selected, onClick = { onSelect(mode) })
                     Text(label)
                 }

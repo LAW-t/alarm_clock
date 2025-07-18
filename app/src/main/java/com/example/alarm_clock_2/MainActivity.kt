@@ -49,6 +49,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.navigation.compose.navigation
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.Density
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Calendar : Screen("calendar", "日历", Icons.Default.DateRange)
@@ -130,10 +134,21 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        content = content
-    )
+fun AppTheme(
+    minFontScale: Float = 1f,
+    maxFontScale: Float = 1.2f,
+    content: @Composable () -> Unit
+) {
+    val current = LocalDensity.current
+    // 将系统 fontScale 限制在给定区间内
+    val cappedDensity = remember(current, minFontScale, maxFontScale) {
+        val scale = current.fontScale.coerceIn(minFontScale, maxFontScale)
+        Density(current.density, fontScale = scale)
+    }
+
+    CompositionLocalProvider(LocalDensity provides cappedDensity) {
+        MaterialTheme(content = content)
+    }
 }
 
 @Preview(showBackground = true)
