@@ -50,31 +50,25 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             .fillMaxSize()
             .verticalScroll(scrollState)
             .padding(16.dp),
-        verticalArrangement = Arrangement.Top
+        verticalArrangement = Arrangement.spacedBy(24.dp) // Use spacedBy for consistent spacing
     ) {
-        Text(text = "身份选择", style = MaterialTheme.typography.titleMedium)
-        Spacer(Modifier.height(8.dp))
-        IdentityRadioGroup(selected = ui.identity, onSelect = viewModel::onIdentitySelected)
-
-        Spacer(Modifier.height(16.dp))
+        Column {
+            Text(text = "身份选择", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            IdentityRadioGroup(selected = ui.identity, onSelect = viewModel::onIdentitySelected)
+        }
 
         when (ui.identity) {
             IdentityType.FOUR_THREE -> FourThreeShiftPicker(ui.fourThreeIndex, viewModel::onFourThreeIndexChanged)
             IdentityType.FOUR_TWO -> FourTwoShiftPicker(ui.fourTwoIndex, viewModel::onFourTwoIndexChanged)
-            else -> {}
+            else -> {} // No extra spacer needed here
         }
-
-        Spacer(Modifier.height(16.dp))
 
         // 铃声选择
         RingtonePickerRow(ui.ringtoneUri) { viewModel.onRingtoneSelected(it) }
 
-        Spacer(Modifier.height(16.dp))
-
         // 播放模式选择
         PlayModeRadioGroup(selected = ui.playMode, onSelect = viewModel::onPlayModeSelected)
-
-        Spacer(Modifier.height(24.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(text = "法定节假日休息")
@@ -82,13 +76,14 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             Switch(checked = ui.holidayRest, onCheckedChange = viewModel::onHolidayRestChanged)
         }
 
-        Spacer(Modifier.height(24.dp))
-
         // 当前版本 & 更新
         VersionRow(viewModel = viewModel)
 
         // 开发者信息
         DeveloperInfoRow()
+
+        // Add extra space at the bottom
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -128,11 +123,13 @@ private fun FourThreeShiftPicker(selectedIndex: Int, onSelect: (Int) -> Unit) {
 
     var selectedLabel by remember(selectedIndex) { mutableStateOf(indexToLabel(selectedIndex)) }
 
-    Text(text = "今天班次")
-    Spacer(Modifier.height(4.dp))
-    ShiftOptionRow(options = labels, selected = selectedLabel, allowed = labels) { newLabel ->
-        selectedLabel = newLabel
-        onSelect(labelToIndex(newLabel))
+    Column {
+        Text(text = "今天班次")
+        Spacer(Modifier.height(4.dp))
+        ShiftOptionRow(options = labels, selected = selectedLabel, allowed = labels) { newLabel ->
+            selectedLabel = newLabel
+            onSelect(labelToIndex(newLabel))
+        }
     }
 }
 
@@ -156,11 +153,13 @@ private fun FourTwoShiftPicker(selectedIndex: Int, onSelect: (Int) -> Unit) {
 
     var todayLabel by remember(selectedIndex) { mutableStateOf(indexToLabel(selectedIndex)) }
 
-    Text(text = "今天班次")
-    Spacer(Modifier.height(4.dp))
-    ShiftOptionRow(options = labels, selected = todayLabel, allowed = labels) { newLabel ->
-        todayLabel = newLabel
-        onSelect(labelToIndex(newLabel))
+    Column {
+        Text(text = "今天班次")
+        Spacer(Modifier.height(4.dp))
+        ShiftOptionRow(options = labels, selected = todayLabel, allowed = labels) { newLabel ->
+            todayLabel = newLabel
+            onSelect(labelToIndex(newLabel))
+        }
     }
 }
 

@@ -22,9 +22,11 @@ import com.example.alarm_clock_2.shift.IdentityType
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.launch
 import android.widget.NumberPicker
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import android.graphics.drawable.ColorDrawable
 import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,6 +101,7 @@ private fun AlarmRow(
 
     // 当前时间展示
     val timeDisplay = alarm?.time ?: "--:--"
+    val context = LocalContext.current
 
     if (showPicker) {
         val initialHour: Int
@@ -156,7 +159,13 @@ private fun AlarmRow(
 
             Switch(
                 checked = alarm?.enabled ?: false,
-                onCheckedChange = { onToggle() }
+                onCheckedChange = {
+                    if (alarm == null) {
+                        Toast.makeText(context, "请先选择闹钟时间", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onToggle()
+                    }
+                }
             )
         }
     }
