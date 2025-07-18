@@ -96,6 +96,7 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.compose.material.icons)
     implementation(libs.compose.foundation)
+    implementation(libs.material3.window.size)
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.hilt.navigation.compose)
 

@@ -102,14 +102,25 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
         Spacer(Modifier.height(8.dp))
 
         // ----- Day of week labels -----
-        Row(modifier = Modifier.fillMaxWidth()) {
-            DayOfWeek.values().forEach {
-                Text(
-                    text = it.getDisplayName(TextStyle.SHORT, Locale.CHINESE),
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.bodySmall
-                )
+        // 宽度与下方日期网格保持一致
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val maxGridWidth = 600.dp
+            val gridWidth = if (maxWidth > maxGridWidth) maxGridWidth else maxWidth
+            val horizontalPad = (maxWidth - gridWidth) / 2
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = horizontalPad, end = horizontalPad)
+            ) {
+                DayOfWeek.values().forEach {
+                    Text(
+                        text = it.getDisplayName(TextStyle.SHORT, Locale.CHINESE),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
         }
 
@@ -193,18 +204,22 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
 
     Column(
         modifier = Modifier
+            .fillMaxWidth() // 撑满列宽，解决列间隙和对齐问题
             // 使用最小高度，但允许内容撑开，避免 Chip 被裁剪
             .heightIn(min = cellHeight)
-            .padding(2.dp)
+            .padding(vertical = 2.dp)   // 仅垂直内边距，避免列之间产生可见空隙
             // 不再高亮节假日
             .then(clickModifier),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         // Date number with unified circle wrapper
+        val fontScale = LocalConfiguration.current.fontScale
+        val circleSize = (56.dp * fontScale).coerceIn(14.dp, 26.dp)
+
         Box(
             modifier = Modifier
-                .size(32.dp)
+                .size(circleSize)
                 .background(
                     color = if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
                     shape = androidx.compose.foundation.shape.CircleShape
@@ -228,8 +243,8 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
             }
         }
 
-        // 数字与农历/节假日文本之间的间距
-        Spacer(modifier = Modifier.height(2.dp))
+        // 数字与农历/节假日文本之间的间距（稍微缩小）
+        Spacer(modifier = Modifier.height(1.dp))
 
         // Lunar day text (replace with first 2 chars of holiday name if present)
         val lunarText = day.holiday?.name?.take(2) ?: day.lunarDay
@@ -265,9 +280,19 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
             val fontScale = LocalConfiguration.current.fontScale
             val baseMin = 48.dp
             val minHeight = baseMin * fontScale.coerceIn(1f, 1.4f)
-            val rawHeight = maxHeight / 6
-            // cellHeight 最小为 minHeight，但若屏幕足够高则可增大
-            val cellHeight = if (rawHeight < minHeight) minHeight else rawHeight
+            val maxHeightCap = 80.dp * fontScale.coerceIn(1f, 1.4f)
+
+            // 修正：先为行间距预留空间，再计算单元格高度
+            // 1. 决定行间距大小 (自适应，并限制在 2dp-8dp)
+            val desiredGap = (maxHeight * 0.02f).coerceIn(2.dp, 8.dp)
+            val totalGapHeight = desiredGap * 5 // 6行之间有5个间距
+
+            // 2. 用剩余空间计算单元格高度
+            val heightForCells = maxHeight - totalGapHeight
+            val rawHeight = if (heightForCells > 0.dp) heightForCells / 6 else 0.dp
+
+            // 3. 应用最大/最小高度约束
+            val cellHeight = rawHeight.coerceIn(minHeight, maxHeightCap)
 
             // 视图所需总高度按实际 cellHeight 重新计算
             val needHeight = cellHeight * 6
@@ -283,12 +308,13 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
             val gridWidth = if (maxWidth > maxGridWidth) maxGridWidth else maxWidth
             val horizontalPad = (maxWidth - gridWidth) / 2
 
-            val scrollEnabled = needHeight > maxHeight
+            val scrollEnabled = (needHeight + totalGapHeight) > maxHeight
 
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = horizontalPad, end = horizontalPad),
+                verticalArrangement = Arrangement.spacedBy(desiredGap),
                 userScrollEnabled = scrollEnabled
             ) {
                 items(weeks) { week ->
