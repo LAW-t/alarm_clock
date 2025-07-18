@@ -51,12 +51,12 @@ data class ShiftConfig(
 
 object ShiftCalculator {
 
-    // 顺序：休、休、早、早、中、中、晚、晚
+    // 顺序：休、休、晚、晚、早、早、中、中
     private val patternFourThree = listOf(
         Shift.OFF, Shift.OFF,
+        Shift.NIGHT, Shift.NIGHT,
         Shift.MORNING, Shift.MORNING,
-        Shift.AFTERNOON, Shift.AFTERNOON,
-        Shift.NIGHT, Shift.NIGHT
+        Shift.AFTERNOON, Shift.AFTERNOON
     )
 
     private val patternFourTwo = listOf(

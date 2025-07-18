@@ -182,14 +182,14 @@ private fun shiftLabel(shift: com.example.alarm_clock_2.shift.Shift): String = w
 }
 
 @Composable
-private fun DayCell(day: CalendarViewModel.DayInfo, cellHeight: androidx.compose.ui.unit.Dp) {
+private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo, cellHeight: androidx.compose.ui.unit.Dp) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val today = java.time.LocalDate.now()
     val isToday = day.date == today
 
     val clickModifier = remember(day.date) {
         Modifier.combinedClickable(onClick = {
-            day.holidayName?.let { name ->
+            day.holiday?.name?.let { name ->
                 android.widget.Toast.makeText(context, name, android.widget.Toast.LENGTH_SHORT).show()
             }
         })
@@ -235,7 +235,7 @@ private fun DayCell(day: CalendarViewModel.DayInfo, cellHeight: androidx.compose
         Spacer(modifier = Modifier.height(4.dp))
 
         // Lunar day text (replace with first 2 chars of holiday name if present)
-        val lunarText = day.holidayName?.take(2) ?: day.lunarDay
+        val lunarText = day.holiday?.name?.take(2) ?: day.lunarDay
         Text(
             text = lunarText,
             style = MaterialTheme.typography.labelSmall,
@@ -253,25 +253,27 @@ private fun DayCell(day: CalendarViewModel.DayInfo, cellHeight: androidx.compose
 // ------- 月份网格 -------
 @Composable
 private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel = hiltViewModel()) {
-    // Trigger recomposition when holiday table updated
-    val holidayVer by viewModel.holidayVersion.collectAsState()
+    val monthInfo by viewModel.monthInfoFlow(month).collectAsState(initial = com.example.alarm_clock_2.calendar.MonthInfo(month, viewModel.peekMonthDays(month)))
+    val days = monthInfo.days
 
-    val days by produceState<List<CalendarViewModel.DayInfo>>(initialValue = viewModel.peekMonthDays(month), month, holidayVer) {
-        value = viewModel.getMonthDays(month)
-    }
-
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-    ) {
-        val cellHeight = maxHeight / 6
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(7),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(4.dp)
+    if (days.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+    } else {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
         ) {
-            items(days, key = { it.date }) { day ->
-                DayCell(day = day, cellHeight = cellHeight)
+            val cellHeight = maxHeight / 6
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(7),
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(4.dp)
+            ) {
+                items(days, key = { it.date }) { day ->
+                    DayCell(day = day, cellHeight = cellHeight)
+                }
             }
         }
     }

@@ -114,41 +114,19 @@ private fun IdentityRadioGroup(
 
 @Composable
 private fun FourThreeShiftPicker(selectedIndex: Int, onSelect: (Int) -> Unit) {
-    val pattern = listOf("休", "休", "晚", "晚", "早", "早", "中", "中")
-    val size = pattern.size
+    // 顺序：休(一)0 休(二)1 晚(一)2 晚(二)3 早(一)4 早(二)5 中(一)6 中(二)7
+    val labels = listOf("休(一)", "休(二)", "晚(一)", "晚(二)", "早(一)", "早(二)", "中(一)", "中(二)")
 
-    // 本地状态：今天/明天班次
-    var today by remember(selectedIndex) { mutableStateOf(pattern[selectedIndex % size]) }
-    var tomorrow by remember(selectedIndex) { mutableStateOf(pattern[(selectedIndex + 1) % size]) }
+    fun indexToLabel(idx: Int): String = labels[idx % 8]
+    fun labelToIndex(label: String): Int = labels.indexOf(label).coerceAtLeast(0)
 
-    val options = listOf("休", "早", "中", "晚")
-
-    // 根据另一日班次限制可选项
-    val allowedToday = remember(tomorrow) { precedingSet(pattern, tomorrow) }
-    val allowedTomorrow = remember(today) { followingSet(pattern, today) }
+    var selectedLabel by remember(selectedIndex) { mutableStateOf(indexToLabel(selectedIndex)) }
 
     Text(text = "今天班次")
     Spacer(Modifier.height(4.dp))
-    ShiftOptionRow(options, today, allowedToday) { newToday ->
-        today = newToday
-        // 若明天班次不再合法，则自动调整为首个合法值
-        if (tomorrow !in followingSet(pattern, newToday)) {
-            tomorrow = followingSet(pattern, newToday).first()
-        }
-        tryCommit(pattern, today, tomorrow, onSelect)
-    }
-
-    Spacer(Modifier.height(8.dp))
-
-    Text(text = "明天班次")
-    Spacer(Modifier.height(4.dp))
-    ShiftOptionRow(options, tomorrow, allowedTomorrow) { newTomorrow ->
-        tomorrow = newTomorrow
-        // 若今天班次不合法，自动调整
-        if (today !in precedingSet(pattern, newTomorrow)) {
-            today = precedingSet(pattern, newTomorrow).first()
-        }
-        tryCommit(pattern, today, tomorrow, onSelect)
+    ShiftOptionRow(options = labels, selected = selectedLabel, allowed = labels) { newLabel ->
+        selectedLabel = newLabel
+        onSelect(labelToIndex(newLabel))
     }
 }
 
@@ -180,12 +158,7 @@ private fun FourTwoShiftPicker(selectedIndex: Int, onSelect: (Int) -> Unit) {
     }
 }
 
-private fun tryCommit(pattern: List<String>, today: String, tomorrow: String, commit: (Int)->Unit) {
-    val idx = computeIndex(pattern, today, tomorrow)
-    if (idx != -1) {
-        commit(idx)
-    }
-}
+// 旧两日校准函数已废弃
 
 @Composable
 private fun ShiftOptionRow(
@@ -197,53 +170,21 @@ private fun ShiftOptionRow(
     Row {
         options.forEach { label ->
             val enabled = label in allowed
-            FilterChip(label = label, selected = label == selected, enabled = enabled) {
-                if (enabled) onOptionSelect(label)
-            }
+            AssistChip(
+                onClick = { if (enabled) onOptionSelect(label) },
+                label = { Text(label) },
+                enabled = enabled,
+                colors = AssistChipDefaults.assistChipColors(
+                    containerColor = if (label == selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                    labelColor = if (label == selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                )
+            )
             Spacer(Modifier.width(4.dp))
         }
     }
 }
 
-// 计算符合今明班次组合的周期起始下标，若无匹配返回 0
-private fun computeIndex(pattern: List<String>, today: String, tomorrow: String): Int {
-    val size = pattern.size
-    for (i in 0 until size) {
-        if (pattern[i] == today && pattern[(i + 1) % size] == tomorrow) return i
-    }
-    return -1 // -1 表示未找到匹配组合
-}
-
-// 支持禁用
-@Composable
-private fun FilterChip(label: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
-    AssistChip(
-        onClick = onClick,
-        label = { Text(label) },
-        leadingIcon = null,
-        enabled = enabled,
-        colors = AssistChipDefaults.assistChipColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-            labelColor = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-        )
-    )
-}
-
-// 根据 pattern 计算合法下一天班次集合
-private fun followingSet(pattern: List<String>, today: String): List<String> {
-    val size = pattern.size
-    val set = mutableSetOf<String>()
-    for (i in 0 until size) if (pattern[i] == today) set.add(pattern[(i + 1) % size])
-    return if (set.isNotEmpty()) set.toList() else pattern // fallback 全部
-}
-
-// 根据 pattern 计算合法前一天班次集合
-private fun precedingSet(pattern: List<String>, tomorrow: String): List<String> {
-    val size = pattern.size
-    val set = mutableSetOf<String>()
-    for (i in 0 until size) if (pattern[i] == tomorrow) set.add(pattern[(i - 1 + size) % size])
-    return if (set.isNotEmpty()) set.toList() else pattern
-}
+// 旧 now/tomorrow 逻辑已废弃
 
 @Composable
 private fun RingtonePickerRow(currentUri: String, onUriSelected: (String) -> Unit) {

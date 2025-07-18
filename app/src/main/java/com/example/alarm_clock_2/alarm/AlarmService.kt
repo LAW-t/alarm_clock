@@ -134,7 +134,7 @@ class AlarmService : Service() {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M &&
                     notificationManager.isNotificationPolicyAccessGranted
                 ) {
-                    prevInterruptionFilter = notificationManager.interruptionFilter
+                    prevInterruptionFilter = notificationManager.currentInterruptionFilter
                     if (prevInterruptionFilter != NotificationManager.INTERRUPTION_FILTER_ALL) {
                         notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
                     }
