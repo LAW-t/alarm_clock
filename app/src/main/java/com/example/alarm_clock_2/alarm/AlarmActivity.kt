@@ -25,13 +25,7 @@ class AlarmActivity : ComponentActivity() {
                     WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
         )
 
-        // Start foreground service to play alarm sound (required from API 26+)
-        val serviceIntent = Intent(this, AlarmService::class.java)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent)
-        } else {
-            startService(serviceIntent)
-        }
+        // AlarmService 已由 AlarmReceiver 启动，这里无需再次启动，避免重复播放
 
         setContent {
             MaterialTheme {

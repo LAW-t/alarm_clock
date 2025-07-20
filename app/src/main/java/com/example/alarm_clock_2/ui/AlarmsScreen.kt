@@ -5,22 +5,37 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.alarm_clock_2.shift.IdentityType
+import kotlinx.coroutines.launch
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.DpSize
+import com.commandiron.wheel_picker_compose.WheelTimePicker
+import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
     val alarmsDb = viewModel.alarms.collectAsState().value
+
+    // Toast notifications for next alarm time
+    val ctx = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.toastFlow.collect { msg ->
+            Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
+        }
+    }
 
     // 读取设置，用于确定应显示的班次数量
     val settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -90,6 +105,7 @@ private fun AlarmRow(
 
     // 当前时间展示
     val timeDisplay = alarm?.time ?: "--:--"
+    val context = LocalContext.current
 
     if (showPicker) {
         val initialHour: Int
@@ -103,23 +119,11 @@ private fun AlarmRow(
             initialMinute = 0
         }
 
-        val pickerState = rememberTimePickerState(initialHour, initialMinute, true)
-
-        AlertDialog(
-            onDismissRequest = { showPicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    val newTime = "%02d:%02d".format(pickerState.hour, pickerState.minute)
-                    onTimeChange(newTime)
-                    showPicker = false
-                }) { Text("确定") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPicker = false }) { Text("取消") }
-            },
-            title = { Text("选择时间") },
-            text = {
-                TimePicker(state = pickerState)
+        TimeWheelBottomSheet(
+            initialTime = LocalTime.of(initialHour, initialMinute),
+            onConfirm = { newTime ->
+                onTimeChange(newTime)
+                showPicker = false
             }
         )
     }
@@ -157,7 +161,57 @@ private fun AlarmRow(
 
             Switch(
                 checked = alarm?.enabled ?: false,
-                onCheckedChange = { onToggle() }
+                onCheckedChange = {
+                    if (alarm == null) {
+                        Toast.makeText(context, "请先选择闹钟时间", Toast.LENGTH_SHORT).show()
+                    } else {
+                        onToggle()
+                    }
+                }
+            )
+        }
+    }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TimeWheelBottomSheet(
+    initialTime: LocalTime,
+    onConfirm: (String) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    var selectedTime by remember { mutableStateOf(initialTime) }
+
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
+
+    ModalBottomSheet(
+        onDismissRequest = {
+            val newTime = "%02d:%02d".format(selectedTime.hour, selectedTime.minute)
+            scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(newTime) }
+        },
+        sheetState = sheetState
+    ) {
+        Column(
+            modifier = Modifier
+            .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                "选择时间",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
+
+            val pickerWidth = screenWidth * 0.7f
+            WheelTimePicker(
+                modifier = Modifier.width(pickerWidth),
+                size = DpSize(width = pickerWidth, height = 128.dp),
+                startTime = initialTime,
+                onSnappedTime = { time -> selectedTime = time }
             )
         }
     }

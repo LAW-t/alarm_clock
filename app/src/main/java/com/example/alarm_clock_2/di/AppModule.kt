@@ -7,6 +7,7 @@ import com.example.alarm_clock_2.data.AlarmDao
 import com.example.alarm_clock_2.data.AlarmRepository
 import com.example.alarm_clock_2.data.HolidayDao
 import com.example.alarm_clock_2.data.HolidayRepository
+import com.example.alarm_clock_2.calendar.CalendarRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,6 +32,13 @@ object AppModule {
     @Provides fun provideHolidayDao(db: AppDatabase): HolidayDao = db.holidayDao()
 
     @Provides @Singleton fun provideHolidayRepository(dao: HolidayDao): HolidayRepository = HolidayRepository(dao)
+
+    @Provides
+    @Singleton
+    fun provideCalendarRepository(
+        settingsDataStore: com.example.alarm_clock_2.data.SettingsDataStore,
+        holidayRepository: HolidayRepository
+    ): CalendarRepository = CalendarRepository(settingsDataStore, holidayRepository)
 
     @Provides
     @Singleton

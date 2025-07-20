@@ -16,9 +16,11 @@ dependencyResolutionManagement {
     repositories {
         mavenCentral()
         google()
+        // JitPack – for third-party Compose libraries (e.g. WheelPickerCompose)
+        maven(url = "https://jitpack.io")
     }
 }
 
-rootProject.name = "alarm_clock_2"
+rootProject.name = "alarm_clock"
 include(":app")
  

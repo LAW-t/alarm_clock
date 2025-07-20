@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -8,6 +6,8 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
 }
+
+import java.util.Properties
 
 kotlin {
     sourceSets.all {
@@ -21,10 +21,11 @@ android {
 
     defaultConfig {
         applicationId = "com.example.alarm_clock_2"
-        minSdk = 21
+        // WheelPickerCompose requires API 23+
+        minSdk = 23
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.9.1"
+        versionCode = 3
+        versionName = "0.9.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -96,6 +97,7 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.compose.material.icons)
     implementation(libs.compose.foundation)
+    implementation(libs.material3.window.size)
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.hilt.navigation.compose)
 
@@ -131,4 +133,6 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test)
     debugImplementation(libs.compose.ui.test.manifest)
     implementation(libs.serialization.json)
+    // Jetpack Compose wheel time picker (CommandIron)
+    implementation("com.github.commandiron:WheelPickerCompose:1.1.3")
 }

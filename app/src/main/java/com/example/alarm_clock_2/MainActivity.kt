@@ -49,6 +49,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.navigation.compose.navigation
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.unit.Density
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import com.example.alarm_clock_2.ui.LocalWindowSizeClass
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Calendar : Screen("calendar", "日历", Icons.Default.DateRange)
@@ -61,65 +68,69 @@ private const val MAIN_GRAPH_ROUTE = "main_graph"
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    @OptIn(ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Ensure precise-alarm permission on Android 12+
         ExactAlarmPermission.request(this)
         setContent {
-            AppTheme {
-                val navController = rememberNavController()
-                val items = listOf(
-                    Screen.Calendar,
-                    Screen.Alarms,
-                    Screen.Settings
-                )
-                Scaffold(
-                    bottomBar = {
-                        NavigationBar {
-                            val navBackStackEntry by navController.currentBackStackEntryAsState()
-                            val currentRoute = navBackStackEntry?.destination?.route
-                            items.forEach { screen ->
-                                NavigationBarItem(
-                                    selected = currentRoute == screen.route,
-                                    onClick = {
-                                        if (currentRoute != screen.route) {
-                                            navController.navigate(screen.route) {
-                                                popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                                launchSingleTop = true
-                                                restoreState = true
+            // 计算窗口尺寸等级并注入 CompositionLocal，供各屏幕自适应使用
+            val windowSizeClass = calculateWindowSizeClass(this)
+            CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
+                AppTheme {
+                    val navController = rememberNavController()
+                    val items = listOf(
+                        Screen.Calendar,
+                        Screen.Alarms,
+                        Screen.Settings
+                    )
+                    Scaffold(
+                        bottomBar = {
+                            NavigationBar {
+                                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                                val currentRoute = navBackStackEntry?.destination?.route
+                                items.forEach { screen ->
+                                    NavigationBarItem(
+                                        selected = currentRoute == screen.route,
+                                        onClick = {
+                                            if (currentRoute != screen.route) {
+                                                navController.navigate(screen.route) {
+                                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
                                             }
-                                        }
-                                    },
-                                    icon = { Icon(screen.icon, contentDescription = null) },
-                                    label = { Text(screen.label) }
-                                )
+                                        },
+                                        icon = { Icon(screen.icon, contentDescription = null) },
+                                        label = { Text(screen.label) }
+                                    )
+                                }
                             }
                         }
-                    }
-                ) { innerPadding ->
-                    // Developer info dialog moved to Settings screen
-                    Surface(modifier = Modifier.padding(innerPadding), color = MaterialTheme.colorScheme.background) {
-                        NavHost(
-                            navController = navController,
-                            startDestination = MAIN_GRAPH_ROUTE
-                        ) {
-                            navigation(
-                                startDestination = Screen.Calendar.route,
-                                route = MAIN_GRAPH_ROUTE
+                    ) { innerPadding ->
+                        // Developer info dialog moved to Settings screen
+                        Surface(modifier = Modifier.padding(innerPadding), color = MaterialTheme.colorScheme.background) {
+                            NavHost(
+                                navController = navController,
+                                startDestination = MAIN_GRAPH_ROUTE
                             ) {
-                                composable(Screen.Calendar.route) { backStackEntry ->
-                                    // 使用图级别的 ViewModelStoreOwner，确保 CalendarViewModel 长驻
-                                    val parentEntry = remember(backStackEntry) {
-                                        navController.getBackStackEntry(MAIN_GRAPH_ROUTE)
+                                navigation(
+                                    startDestination = Screen.Calendar.route,
+                                    route = MAIN_GRAPH_ROUTE
+                                ) {
+                                    composable(Screen.Calendar.route) { backStackEntry ->
+                                        // 使用图级别的 ViewModelStoreOwner，确保 CalendarViewModel 长驻
+                                        val parentEntry = remember(backStackEntry) {
+                                            navController.getBackStackEntry(MAIN_GRAPH_ROUTE)
+                                        }
+                                        val viewModel: com.example.alarm_clock_2.ui.CalendarViewModel =
+                                            androidx.hilt.navigation.compose.hiltViewModel(parentEntry)
+                                        CalendarScreen(viewModel)
                                     }
-                                    val viewModel: com.example.alarm_clock_2.ui.CalendarViewModel =
-                                        androidx.hilt.navigation.compose.hiltViewModel(parentEntry)
-                                    CalendarScreen(viewModel)
-                                }
 
-                                composable(Screen.Alarms.route) { AlarmsScreen() }
-                                composable(Screen.Settings.route) { SettingsScreen() }
+                                    composable(Screen.Alarms.route) { AlarmsScreen() }
+                                    composable(Screen.Settings.route) { SettingsScreen() }
+                                }
                             }
                         }
                     }
@@ -130,10 +141,21 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun AppTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        content = content
-    )
+fun AppTheme(
+    minFontScale: Float = 1f,
+    maxFontScale: Float = 1.2f,
+    content: @Composable () -> Unit
+) {
+    val current = LocalDensity.current
+    // 将系统 fontScale 限制在给定区间内
+    val cappedDensity = remember(current, minFontScale, maxFontScale) {
+        val scale = current.fontScale.coerceIn(minFontScale, maxFontScale)
+        Density(current.density, fontScale = scale)
+    }
+
+    CompositionLocalProvider(LocalDensity provides cappedDensity) {
+        MaterialTheme(content = content)
+    }
 }
 
 @Preview(showBackground = true)
