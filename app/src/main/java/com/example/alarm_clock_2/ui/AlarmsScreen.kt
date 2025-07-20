@@ -8,30 +8,34 @@ import androidx.compose.material3.*
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.*
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.alarm_clock_2.shift.IdentityType
-import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.launch
-import android.widget.NumberPicker
 import android.widget.Toast
-import androidx.core.content.ContextCompat
-import android.graphics.drawable.ColorDrawable
-import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.DpSize
+import com.commandiron.wheel_picker_compose.WheelTimePicker
+import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
     val alarmsDb = viewModel.alarms.collectAsState().value
+
+    // Toast notifications for next alarm time
+    val ctx = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.toastFlow.collect { msg ->
+            Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show()
+        }
+    }
 
     // 读取设置，用于确定应显示的班次数量
     val settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -116,13 +120,11 @@ private fun AlarmRow(
         }
 
         TimeWheelBottomSheet(
-            initialHour = initialHour,
-            initialMinute = initialMinute,
+            initialTime = LocalTime.of(initialHour, initialMinute),
             onConfirm = { newTime ->
                 onTimeChange(newTime)
                 showPicker = false
-            },
-            onDismiss = { showPicker = false }
+            }
         )
     }
 
@@ -175,149 +177,42 @@ private fun AlarmRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TimeWheelBottomSheet(
-    initialHour: Int,
-    initialMinute: Int,
+    initialTime: LocalTime,
     onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
+    var selectedTime by remember { mutableStateOf(initialTime) }
 
-    var hour by remember { mutableIntStateOf(initialHour) }
-    var minute by remember { mutableIntStateOf(initialMinute) }
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp
 
     ModalBottomSheet(
         onDismissRequest = {
-            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+            val newTime = "%02d:%02d".format(selectedTime.hour, selectedTime.minute)
+            scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(newTime) }
         },
         sheetState = sheetState
     ) {
-        Text(
-            text = "选择时间",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.align(Alignment.CenterHorizontally)
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        Box(modifier = Modifier
+        Column(
+            modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)  // Reduced height to roughly one-third of the screen
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Highlight overlay at center
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth(0.8f)
-                    .height(36.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
+            Text(
+                "选择时间",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 20.dp)
             )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.Center),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                AndroidView(
-                    modifier = Modifier.height(140.dp),  // Adjusted height for NumberPicker
-                    factory = { context ->
-                    NumberPicker(context).apply {
-                        minValue = 0
-                        maxValue = 23
-                        value = hour
-                        wrapSelectorWheel = true
-                        setFormatter { String.format("%02d", it) }
-                        setOnValueChangedListener { _, _, newVal -> hour = newVal }
-
-                        // Style adjustments
-                        setTextColor(ContextCompat.getColor(context, android.R.color.black))
-                        textSize = 40f // Increased from 30f to make numbers even larger
-                        
-                        // Remove divider lines completely
-                        try {
-                            val divField = NumberPicker::class.java.getDeclaredField("mSelectionDivider")
-                            divField.isAccessible = true
-                            divField.set(this, ColorDrawable(android.graphics.Color.TRANSPARENT))
-                            
-                            // Increase the number of displayed values to enhance wheel feeling
-                            val selectorWheelPaintField = NumberPicker::class.java.getDeclaredField("mSelectorWheelPaint")
-                            selectorWheelPaintField.isAccessible = true
-                            val paint = selectorWheelPaintField.get(this) as android.graphics.Paint
-                            paint.textSize = resources.displayMetrics.density * 36 // Match with textSize
-                            
-                            // Adjust the displayed values count
-                            val countField = NumberPicker::class.java.getDeclaredField("mShownCount")
-                            if (countField != null) {
-                                countField.isAccessible = true
-                                countField.set(this, 5) // Show 5 items (more wheel-like)
-                            }
-                        } catch (_: Throwable) {}
-                    }
-                })
-
-                Spacer(modifier = Modifier.width(12.dp))
-
-                AndroidView(
-                    modifier = Modifier.height(140.dp),  // Adjusted height for NumberPicker
-                    factory = { context ->
-                    NumberPicker(context).apply {
-                        minValue = 0
-                        maxValue = 59
-                        value = minute
-                        wrapSelectorWheel = true
-                        setFormatter { String.format("%02d", it) }
-                        setOnValueChangedListener { _, _, newVal -> minute = newVal }
-
-                        setTextColor(ContextCompat.getColor(context, android.R.color.black))
-                        textSize = 36f // Increased from 30f to make numbers even larger
-
-                        try {
-                            val divField = NumberPicker::class.java.getDeclaredField("mSelectionDivider")
-                            divField.isAccessible = true
-                            divField.set(this, ColorDrawable(android.graphics.Color.TRANSPARENT))
-                            
-                            // Increase the number of displayed values to enhance wheel feeling
-                            val selectorWheelPaintField = NumberPicker::class.java.getDeclaredField("mSelectorWheelPaint")
-                            selectorWheelPaintField.isAccessible = true
-                            val paint = selectorWheelPaintField.get(this) as android.graphics.Paint
-                            paint.textSize = resources.displayMetrics.density * 36 // Match with textSize
-                            
-                            // Adjust the displayed values count
-                            val countField = NumberPicker::class.java.getDeclaredField("mShownCount")
-                            if (countField != null) {
-                                countField.isAccessible = true
-                                countField.set(this, 5) // Show 5 items (more wheel-like)
-                            }
-                        } catch (_: Throwable) {}
-                    }
-                })
-            }
+            val pickerWidth = screenWidth * 0.7f
+            WheelTimePicker(
+                modifier = Modifier.width(pickerWidth),
+                size = DpSize(width = pickerWidth, height = 128.dp),
+                startTime = initialTime,
+                onSnappedTime = { time -> selectedTime = time }
+            )
         }
-
-        Spacer(Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.End
-        ) {
-            TextButton(onClick = {
-                scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-            }) { Text("取消") }
-
-            Spacer(Modifier.width(16.dp))
-
-            TextButton(onClick = {
-                val newTime = "%02d:%02d".format(hour, minute)
-                scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(newTime) }
-            }) { Text("确定") }
-        }
-
-        Spacer(Modifier.height(16.dp))
     }
 } 

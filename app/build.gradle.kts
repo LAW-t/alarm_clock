@@ -21,10 +21,11 @@ android {
 
     defaultConfig {
         applicationId = "com.example.alarm_clock_2"
-        minSdk = 21
+        // WheelPickerCompose requires API 23+
+        minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.9"
+        versionCode = 3
+        versionName = "0.9.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -132,4 +133,6 @@ dependencies {
     androidTestImplementation(libs.compose.ui.test)
     debugImplementation(libs.compose.ui.test.manifest)
     implementation(libs.serialization.json)
+    // Jetpack Compose wheel time picker (CommandIron)
+    implementation("com.github.commandiron:WheelPickerCompose:1.1.3")
 }

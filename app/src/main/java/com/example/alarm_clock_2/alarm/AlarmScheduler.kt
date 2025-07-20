@@ -70,6 +70,16 @@ class AlarmScheduler @Inject constructor(
         Log.d(TAG, "Cancelled alarm id=${entity.id}")
     }
 
+    /**
+     * Returns epoch millis of the next time this alarm will fire, or null if unable to compute
+     * (e.g. invalid time format or alarm disabled).
+     */
+    fun nextTriggerMillis(entity: AlarmTimeEntity): Long? {
+        if (!entity.enabled) return null
+        val localTime = parseTime(entity.time) ?: return null
+        return computeNextTriggerMillisForShift(localTime, entity.shift)
+    }
+
     /** The PendingIntent that fires when alarm is triggered. */
     private fun buildBroadcastPendingIntent(entity: AlarmTimeEntity): PendingIntent {
         val intent = Intent(context, AlarmReceiver::class.java).apply {

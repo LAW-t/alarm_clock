@@ -66,6 +66,20 @@ class AlarmService : Service() {
         vibrator = getSystemService(VIBRATOR_SERVICE) as Vibrator
         createChannel()
 
+        // Post a silent foreground notification placeholder immediately to comply with 5-second rule
+        // (will be updated with full content in onStartCommand)
+        val placeholder = NotificationCompat.Builder(this, channelId)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle("闹钟启动中…")
+            .setOngoing(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(1, placeholder, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+        } else {
+            startForeground(1, placeholder)
+        }
+
         // Load settings synchronously (small IO on start):
         runBlocking {
             playMode = AlarmPlayMode.from(settings.playModeFlow.first())
@@ -210,11 +224,29 @@ class AlarmService : Service() {
         val stopPending = PendingIntent.getService(
             this, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+
+        // Full-screen intent so that it can wake the screen / launch UI when the phone is locked
+        val fullScreenIntent = Intent(this, AlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val fullScreenPending = PendingIntent.getActivity(
+            this,
+            1,
+            fullScreenIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle("闹钟响铃")
             .setContentText("闹钟正在响铃…")
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止", stopPending)
+            // Make the whole notification clickable as well, opening the full-screen alarm UI
+            .setContentIntent(fullScreenPending)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setFullScreenIntent(fullScreenPending, true)
             .setOngoing(true)
             .build()
     }

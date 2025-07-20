@@ -298,8 +298,14 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
             val needHeight = cellHeight * 6
 
             // prepare weeks
-            val totalSlots = 7*6
-            val padded: List<com.example.alarm_clock_2.calendar.DayInfo?> = days.map{it} + List(totalSlots - days.size){null}
+            // Insert leading blanks so the first day aligns with its weekday column
+            val firstDayOfWeekIdx = days.firstOrNull()?.date?.dayOfWeek?.value?.minus(1) ?: 0 // 0=Mon, 6=Sun
+
+            val totalSlots = 7 * 6
+            val padded: List<com.example.alarm_clock_2.calendar.DayInfo?> =
+                List(firstDayOfWeekIdx) { null } +
+                        days.map { it } +
+                        List(totalSlots - firstDayOfWeekIdx - days.size) { null }
             val weeks = padded.chunked(7)
 
             // ----------- 适配大尺寸 -----------

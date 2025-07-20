@@ -75,9 +75,6 @@ class CalendarRepository @Inject constructor(
         us: UserSettings,
         holidays: List<com.example.alarm_clock_2.data.HolidayDayEntity>
     ): MonthInfo = withContext(Dispatchers.Default) {
-        // Check cache first (if settings or holidays haven't changed the entry might still be valid)
-        cache[month]?.let { return@withContext it }
-
         // Fire-and-forget download of holiday data，不阻塞首帧
         scope.launch {
             runCatching {

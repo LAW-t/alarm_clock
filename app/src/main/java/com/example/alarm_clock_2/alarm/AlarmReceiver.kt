@@ -30,6 +30,14 @@ class AlarmReceiver : BroadcastReceiver() {
         wakeLock.acquire(10 * 60 * 1000L /* 10 minutes */)
         Log.d("AlarmReceiver", "WakeLock acquired")
 
+        // Start foreground service to play alarm sound in case UI cannot be shown
+        val serviceIntent = Intent(context, AlarmService::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent)
+        } else {
+            context.startService(serviceIntent)
+        }
+
         val activityIntent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("shift", intent.getStringExtra("shift"))
