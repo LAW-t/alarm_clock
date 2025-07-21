@@ -45,7 +45,9 @@
         <receiver android:name=".alarm.AlarmReceiver" android:exported="false" />
 
         <!-- Re-schedule alarms after device reboot -->
-        <receiver android:name=".alarm.BootCompletedReceiver" android:exported="false">
+        <receiver
+            android:name=".alarm.BootCompletedReceiver"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>

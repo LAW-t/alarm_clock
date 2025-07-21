@@ -73,6 +73,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Ensure precise-alarm permission on Android 12+
         ExactAlarmPermission.request(this)
+        // Request notification runtime permission on Android 13+
+        com.example.alarm_clock_2.util.NotificationPermission.request(this)
         setContent {
             // 计算窗口尺寸等级并注入 CompositionLocal，供各屏幕自适应使用
             val windowSizeClass = calculateWindowSizeClass(this)

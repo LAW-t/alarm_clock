@@ -42,6 +42,7 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.border
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.rememberScrollState
@@ -220,16 +221,19 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
         Box(
             modifier = Modifier
                 .size(circleSize)
-                .background(
-                    color = if (isToday) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else Color.Transparent,
-                    shape = androidx.compose.foundation.shape.CircleShape
+                .then(
+                    if (isToday) Modifier.border(
+                        width = 1.5.dp,
+                        color = MaterialTheme.colorScheme.error,
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    ) else Modifier
                 ),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = day.date.dayOfMonth.toString(),
                 style = if (isToday) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-                color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                color = if (isToday) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
             )
 
             // Holiday dot indicator (top-right)
