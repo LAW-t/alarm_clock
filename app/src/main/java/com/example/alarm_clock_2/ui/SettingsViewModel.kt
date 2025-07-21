@@ -28,6 +28,8 @@ class SettingsViewModel @Inject constructor(
         val fourTwoIndex: Int = 0,
         val playMode: AlarmPlayMode = AlarmPlayMode.SOUND,
         val ringtoneUri: String = "",
+        val snoozeCount: Int = 3,
+        val snoozeInterval: Int = 5,
         val latestVersion: String? = null
     )
 
@@ -47,6 +49,8 @@ class SettingsViewModel @Inject constructor(
         dataStore.fourTwoIndexFlow,
         dataStore.playModeFlow,
         dataStore.ringtoneUriFlow,
+        dataStore.snoozeCountFlow,
+        dataStore.snoozeIntervalFlow,
         _latestVersion
     ) { values ->
         val identity = toIdentity(values[0] as String)
@@ -55,8 +59,10 @@ class SettingsViewModel @Inject constructor(
         val idx42 = values[3] as Int
         val mode = AlarmPlayMode.from(values[4] as String)
         val uri = values[5] as String
-        val latestVersion = values[6] as String?
-        UiState(identity, holiday, idx43, idx42, mode, uri, latestVersion)
+        val count = values[6] as Int
+        val interval = values[7] as Int
+        val latestVersion = values[8] as String?
+        UiState(identity, holiday, idx43, idx42, mode, uri, count, interval, latestVersion)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState())
 
     val uiState: StateFlow<UiState> = _uiState
@@ -77,6 +83,10 @@ class SettingsViewModel @Inject constructor(
 
     fun onPlayModeSelected(mode: AlarmPlayMode) = launch { dataStore.setPlayMode(mode.name) }
     fun onRingtoneSelected(uri: String) = launch { dataStore.setRingtoneUri(uri) }
+
+    fun onSnoozeCountChanged(count: Int) = launch { dataStore.setSnoozeCount(count) }
+
+    fun onSnoozeIntervalChanged(minutes: Int) = launch { dataStore.setSnoozeInterval(minutes) }
 
     private fun launch(block: suspend () -> Unit) = viewModelScope.launch { block() }
 

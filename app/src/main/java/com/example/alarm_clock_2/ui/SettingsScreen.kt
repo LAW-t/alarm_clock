@@ -38,6 +38,7 @@ import android.widget.Toast
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import kotlin.math.roundToInt
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
@@ -69,6 +70,12 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
         // 播放模式选择
         PlayModeRadioGroup(selected = ui.playMode, onSelect = viewModel::onPlayModeSelected)
+
+        // 重复响铃次数
+        SnoozeCountRow(count = ui.snoozeCount, onChange = viewModel::onSnoozeCountChanged)
+
+        // 重复响铃间隔
+        SnoozeIntervalRow(interval = ui.snoozeInterval, onChange = viewModel::onSnoozeIntervalChanged)
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(text = "法定节假日休息")
@@ -286,7 +293,7 @@ private fun VersionRow(viewModel: SettingsViewModel) {
                                 downloading = false
                                 showDialog = false
                             }
-                        }) { Text("更新到最新版本") }
+                        }) { Text("更新") }
                         Spacer(Modifier.width(8.dp))
                     }
                     TextButton(enabled = !downloading, onClick = { showDialog = false }) { Text("关闭") }
@@ -355,6 +362,32 @@ private fun DeveloperInfoRow() {
                     })
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun SnoozeCountRow(count: Int, onChange: (Int) -> Unit) {
+    Column {
+        Text("重复响铃次数：$count 次")
+        Slider(
+            value = count.toFloat(),
+            onValueChange = { onChange(it.roundToInt()) },
+            valueRange = 0f..5f,
+            steps = 4 // 6 discrete values (0~5) — steps exclude endpoints
+        )
+    }
+}
+
+@Composable
+private fun SnoozeIntervalRow(interval: Int, onChange: (Int) -> Unit) {
+    Column {
+        Text("重复间隔：$interval 分钟")
+        Slider(
+            value = interval.toFloat(),
+            onValueChange = { onChange(it.toInt()) },
+            valueRange = 1f..10f,
+            steps = 10 - 2 // 1..10 inclusive => 8 steps
         )
     }
 } 

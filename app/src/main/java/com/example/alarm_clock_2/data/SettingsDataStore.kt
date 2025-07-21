@@ -29,6 +29,9 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
         // 新增: 铃声 uri & 播放模式
         val RINGTONE_URI = stringPreferencesKey("ringtone_uri")
         val PLAY_MODE = stringPreferencesKey("play_mode")
+        // 重复响铃次数与间隔
+        val SNOOZE_COUNT = intPreferencesKey("snooze_count")
+        val SNOOZE_INTERVAL = intPreferencesKey("snooze_interval")
     }
 
     val identityFlow: Flow<String> = context.dataStore.data.map { it[Keys.IDENTITY] ?: "LONG_DAY" }
@@ -52,6 +55,10 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
     // === 新增设置 ===
     val ringtoneUriFlow: Flow<String> = context.dataStore.data.map { it[Keys.RINGTONE_URI] ?: "" }
     val playModeFlow: Flow<String> = context.dataStore.data.map { it[Keys.PLAY_MODE] ?: "SOUND" }
+
+    // 新增：重复响铃设置，默认次数 3 次，间隔 5 分钟
+    val snoozeCountFlow: Flow<Int> = context.dataStore.data.map { it[Keys.SNOOZE_COUNT] ?: 3 }
+    val snoozeIntervalFlow: Flow<Int> = context.dataStore.data.map { it[Keys.SNOOZE_INTERVAL] ?: 5 }
 
     // === setter ===
     suspend fun setIdentity(value: String) {
@@ -86,5 +93,13 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
     }
     suspend fun setPlayMode(mode: String) {
         context.dataStore.edit { it[Keys.PLAY_MODE] = mode }
+    }
+
+    suspend fun setSnoozeCount(count: Int) {
+        context.dataStore.edit { it[Keys.SNOOZE_COUNT] = count }
+    }
+
+    suspend fun setSnoozeInterval(minutes: Int) {
+        context.dataStore.edit { it[Keys.SNOOZE_INTERVAL] = minutes }
     }
 } 

@@ -35,6 +35,7 @@ class AlarmService : Service() {
 
     companion object {
         const val ACTION_STOP = "com.example.alarm_clock_2.alarm.ACTION_STOP_ALARM"
+        const val ACTION_PAUSE = "com.example.alarm_clock_2.alarm.ACTION_PAUSE_ALARM"
     }
     private var ringtone: Ringtone? = null
     private var toneGen: ToneGenerator? = null
@@ -48,6 +49,11 @@ class AlarmService : Service() {
     private var playMode: AlarmPlayMode = AlarmPlayMode.SOUND
     private var ringtoneUriStr: String = ""
     private lateinit var notificationManager: NotificationManager
+
+    // Extras from triggering intent
+    private var alarmId: Int = 0
+    private var snoozeRemaining: Int = 0
+    private var shift: String? = null
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -88,10 +94,24 @@ class AlarmService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_STOP) {
-            stopSelf()
-            return START_NOT_STICKY
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopSelf()
+                return START_NOT_STICKY
+            }
+            ACTION_PAUSE -> {
+                handlePause(intent)
+                stopSelf()
+                return START_NOT_STICKY
+            }
         }
+
+        // Normal start after alarm trigger
+        // Cache extras for building notification & pause handling
+        alarmId = intent?.getIntExtra("alarm_id", 0) ?: 0
+        snoozeRemaining = intent?.getIntExtra("snooze_remaining", 0) ?: 0
+        shift = intent?.getStringExtra("shift")
+
         val notif = buildForegroundNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(1, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
@@ -220,6 +240,15 @@ class AlarmService : Service() {
     }
 
     private fun buildForegroundNotification(): Notification {
+        val pauseIntent = Intent(this, AlarmService::class.java).apply {
+            action = ACTION_PAUSE
+            putExtra("alarm_id", alarmId)
+            putExtra("shift", shift)
+            putExtra("snooze_remaining", snoozeRemaining)
+        }
+        val pausePending = PendingIntent.getService(
+            this, 2, pauseIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
         val stopIntent = Intent(this, AlarmService::class.java).apply { action = ACTION_STOP }
         val stopPending = PendingIntent.getService(
             this, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -240,6 +269,7 @@ class AlarmService : Service() {
             .setContentTitle("闹钟响铃")
             .setContentText("闹钟正在响铃…")
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .addAction(android.R.drawable.ic_media_pause, "暂停", pausePending)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止", stopPending)
             // Make the whole notification clickable as well, opening the full-screen alarm UI
             .setContentIntent(fullScreenPending)
@@ -262,6 +292,36 @@ class AlarmService : Service() {
                     toneGen?.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD)
                 }
             }
+        }
+    }
+
+    private fun handlePause(intent: Intent) {
+        val remaining = intent.getIntExtra("snooze_remaining", 0)
+        if (remaining <= 0) return
+
+        // Load interval from settings
+        val intervalMin = runBlocking { settings.snoozeIntervalFlow.first() }
+        val delayMillis = intervalMin * 60_000L
+
+        val alarmManager = getSystemService(ALARM_SERVICE) as android.app.AlarmManager
+
+        val nextIntent = Intent(this, AlarmReceiver::class.java).apply {
+            putExtra("alarm_id", intent.getIntExtra("alarm_id", 0))
+            putExtra("shift", intent.getStringExtra("shift"))
+            putExtra("snooze_remaining", remaining - 1)
+        }
+        val pending = PendingIntent.getBroadcast(
+            this,
+            intent.getIntExtra("alarm_id", 0),
+            nextIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val triggerAt = System.currentTimeMillis() + delayMillis
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pending)
+        } else {
+            alarmManager.setExact(android.app.AlarmManager.RTC_WAKEUP, triggerAt, pending)
         }
     }
 } 
