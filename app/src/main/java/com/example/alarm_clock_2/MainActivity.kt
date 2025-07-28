@@ -75,6 +75,8 @@ class MainActivity : ComponentActivity() {
         ExactAlarmPermission.request(this)
         // Request notification runtime permission on Android 13+
         com.example.alarm_clock_2.util.NotificationPermission.request(this)
+        // Reschedule alarms on app startup
+        com.example.alarm_clock_2.worker.RescheduleAlarmsWorker.enqueue(this)
         setContent {
             // 计算窗口尺寸等级并注入 CompositionLocal，供各屏幕自适应使用
             val windowSizeClass = calculateWindowSizeClass(this)
