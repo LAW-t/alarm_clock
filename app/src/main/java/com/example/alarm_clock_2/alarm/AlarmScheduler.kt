@@ -141,7 +141,11 @@ class AlarmScheduler @Inject constructor(
         for (offset in 0..60) {
             val date = LocalDate.now().plusDays(offset.toLong())
             if (ShiftCalculator.calculate(date, config) == desiredShift) {
-                val dt = LocalDateTime.of(date, time)
+                var triggerDate = date
+                if (desiredShift == Shift.NIGHT) {
+                    triggerDate = date.minusDays(1)
+                }
+                val dt = LocalDateTime.of(triggerDate, time)
                 if (dt.isAfter(LocalDateTime.now())) {
                     return dt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 }

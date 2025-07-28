@@ -71,12 +71,12 @@ class ShiftAlarmWorker(
         val baseDate = runCatching { LocalDate.parse(baseDateStr) }.getOrElse { LocalDate.now() }
         val config = ShiftConfig(identity, baseDate, baseIndex)
 
-        var todayShift = ShiftCalculator.calculate(LocalDate.now(), config)
+        var todayShift = ShiftCalculator.calculate(LocalDate.now().plusDays(1), config)
 
         // 若开启“节假日休息”且今天为法定休息日，则强制休息
         val holidayRestEnabled = settings.holidayRestFlow.first()
         if (holidayRestEnabled) {
-            val isOff = holidayRepo.isOffDay(LocalDate.now().toString())
+            val isOff = holidayRepo.isOffDay(LocalDate.now().plusDays(1).toString())
             if (isOff) todayShift = Shift.OFF
         }
 

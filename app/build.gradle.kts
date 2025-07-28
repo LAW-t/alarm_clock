@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,8 +8,6 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
 }
-
-import java.util.Properties
 
 kotlin {
     sourceSets.all {
@@ -24,8 +24,8 @@ android {
         // WheelPickerCompose requires API 23+
         minSdk = 23
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.9.3"
+        versionCode = 5
+        versionName = "0.9.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
