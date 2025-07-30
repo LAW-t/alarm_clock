@@ -16,6 +16,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.alarm_clock_2.ui.SettingsScreen
@@ -59,6 +60,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import com.example.alarm_clock_2.ui.LocalWindowSizeClass
+import com.example.alarm_clock_2.update.*
+import com.example.alarm_clock_2.worker.UpdateCheckWorker
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.runtime.collectAsState
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Calendar : Screen("calendar", "日历", Icons.Default.DateRange)
@@ -80,6 +85,8 @@ class MainActivity : ComponentActivity() {
         com.example.alarm_clock_2.util.NotificationPermission.request(this)
         // Reschedule alarms on app startup
         com.example.alarm_clock_2.worker.RescheduleAlarmsWorker.enqueue(this)
+        // Start periodic update checking
+        UpdateCheckWorker.enqueue(this)
         setContent {
             // 计算窗口尺寸等级并注入 CompositionLocal，供各屏幕自适应使用
             val windowSizeClass = calculateWindowSizeClass(this)
@@ -91,6 +98,19 @@ class MainActivity : ComponentActivity() {
                         Screen.Alarms,
                         Screen.Settings
                     )
+
+                    // Update system integration
+                    val updateViewModel: UpdateViewModel = hiltViewModel()
+                    val updateState by updateViewModel.updateState.collectAsState()
+                    val showUpdateDialog by updateViewModel.showUpdateDialog.collectAsState()
+                    val showDownloadDialog by updateViewModel.showDownloadDialog.collectAsState()
+                    val showInstallDialog by updateViewModel.showInstallDialog.collectAsState()
+
+                    // Check for updates on app startup
+                    LaunchedEffect(Unit) {
+                        val currentVersion = UpdateUtils.getCurrentVersion(this@MainActivity)
+                        updateViewModel.checkForUpdates(currentVersion)
+                    }
                     Scaffold(
                         bottomBar = {
                             // iOS风格的底部导航栏
@@ -166,6 +186,56 @@ class MainActivity : ComponentActivity() {
                                     composable(Screen.Settings.route) { SettingsScreen() }
                                 }
                             }
+                        }
+                    }
+
+                    // Update dialogs
+                    if (showUpdateDialog) {
+                        when (val state = updateState) {
+                            is UpdateState.UpdateAvailable -> {
+                                UpdateAvailableBottomSheet(
+                                    updateInfo = state.updateInfo,
+                                    onDismiss = { updateViewModel.dismissUpdateDialog() },
+                                    onDownload = { updateViewModel.startDownload(state.updateInfo) },
+                                    onPostpone = { updateViewModel.postponeUpdate(state.updateInfo.version) }
+                                )
+                            }
+                            else -> { /* No dialog needed */ }
+                        }
+                    }
+
+                    if (showDownloadDialog) {
+                        when (val state = updateState) {
+                            is UpdateState.Downloading -> {
+                                DownloadProgressBottomSheet(
+                                    progress = state.progress,
+                                    onCancel = { updateViewModel.cancelDownload() },
+                                    onDismiss = { updateViewModel.dismissDownloadDialog() }
+                                )
+                            }
+                            else -> { /* No dialog needed */ }
+                        }
+                    }
+
+                    if (showInstallDialog) {
+                        when (val state = updateState) {
+                            is UpdateState.DownloadComplete -> {
+                                InstallPromptBottomSheet(
+                                    filePath = state.filePath,
+                                    onInstall = {
+                                        try {
+                                            UpdateUtils.installApk(this@MainActivity, state.filePath)
+                                            updateViewModel.dismissInstallDialog()
+                                        } catch (e: Exception) {
+                                            // Handle installation error
+                                            updateViewModel.dismissInstallDialog()
+                                        }
+                                    },
+                                    onLater = { updateViewModel.dismissInstallDialog() },
+                                    onDismiss = { updateViewModel.dismissInstallDialog() }
+                                )
+                            }
+                            else -> { /* No dialog needed */ }
                         }
                     }
                 }

@@ -20,7 +20,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
 import com.example.alarm_clock_2.data.AlarmPlayMode
 import androidx.compose.material3.CircularProgressIndicator
-import com.example.alarm_clock_2.util.Updater
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.clickable
@@ -42,6 +41,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import kotlin.math.roundToInt
+import com.example.alarm_clock_2.update.UpdateViewModel
+import com.example.alarm_clock_2.update.UpdateState
+import com.example.alarm_clock_2.update.UpdateUtils
 
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
@@ -127,7 +129,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         SettingsCard(title = "应用信息") {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 // 当前版本 & 更新
-                VersionRow(viewModel = viewModel)
+                VersionRow()
 
                 // 开发者信息
                 DeveloperInfoRow()
@@ -294,71 +296,89 @@ private fun PlayModeRadioGroup(selected: AlarmPlayMode, onSelect: (AlarmPlayMode
 }
 
 @Composable
-private fun VersionRow(viewModel: SettingsViewModel) {
+private fun VersionRow() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var showDialog by remember { mutableStateOf(false) }
-    // No need to collect latest separately
-    // val latest by viewModel.latestVersion.collectAsState(initial = null)
-    val uiState by viewModel.uiState.collectAsState()
-    val current: String = remember {
-        try {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "N/A"
-        } catch (e: Exception) {
-            "N/A"
-        }
+    val updateViewModel: UpdateViewModel = hiltViewModel()
+    val updateState by updateViewModel.updateState.collectAsState()
+
+    val currentVersion = remember {
+        UpdateUtils.getCurrentVersion(context)
     }
 
-    Row(modifier = Modifier
-        .fillMaxWidth()
-        .clickable { showDialog = true }
-        .padding(vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Text("应用版本")
-        Spacer(Modifier.weight(1f))
-        Text(current)
-    }
-
-    if (showDialog) {
-        var downloading by remember { mutableStateOf(false) }
-        AlertDialog(
-            onDismissRequest = { if (!downloading) showDialog = false },
-            confirmButton = {
-                Row {
-                    if (uiState.latestVersion != null && uiState.latestVersion != current) {
-                        Button(enabled = !downloading, onClick = {
-                            scope.launch {
-                                downloading = true
-                                val info = Updater.fetchLatest()
-                                if (info != null) {
-                                    Updater.startDownload(context, info.apkUrl) {
-                                        Toast.makeText(context, "已开始下载，请查看通知", Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                                downloading = false
-                                showDialog = false
-                            }
-                        }) { Text("更新") }
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    TextButton(enabled = !downloading, onClick = { showDialog = false }) { Text("关闭") }
-                }
-            },
-            title = { Text("应用版本") },
-            text = {
-                Column {
-                    Text("当前版本：$current")
-                    Text("最新版本：${uiState.latestVersion ?: "检查中..."}")
-                    if (downloading) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("正在下载更新…")
-                        }
-                    }
-                }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                // Clear any postponed updates and check manually
+                updateViewModel.clearPostponedUpdate()
+                updateViewModel.checkForUpdates(currentVersion, showProgress = true)
             }
-        )
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = "检查更新",
+                style = MaterialTheme.typography.bodyLarge.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 17.sp
+                )
+            )
+            Text(
+                text = "当前版本: $currentVersion",
+                style = MaterialTheme.typography.bodySmall.copy(
+                    fontSize = 14.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        when (updateState) {
+            is UpdateState.Checking -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+            is UpdateState.UpdateAvailable -> {
+                Text(
+                    text = "有新版本",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            is UpdateState.NoUpdateAvailable -> {
+                Text(
+                    text = "已是最新",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            is UpdateState.Error -> {
+                Text(
+                    text = "检查失败",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            else -> {
+                Text(
+                    text = "点击检查",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontWeight = FontWeight.Medium
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 

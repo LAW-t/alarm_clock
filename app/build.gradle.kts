@@ -135,4 +135,7 @@ dependencies {
     implementation(libs.serialization.json)
     // Jetpack Compose wheel time picker (CommandIron)
     implementation("com.github.commandiron:WheelPickerCompose:1.1.3")
+
+    // HTTP client for update checking
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }
