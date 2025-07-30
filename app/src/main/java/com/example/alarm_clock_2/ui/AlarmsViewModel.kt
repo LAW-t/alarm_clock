@@ -48,12 +48,34 @@ class AlarmsViewModel @Inject constructor(
         }
     }
 
-    fun addAlarm(time: String, shift: String) = viewModelScope.launch {
-        val newAlarm = AlarmTimeEntity(time = time, shift = shift)
+    fun updateAlarm(alarm: AlarmTimeEntity, newTime: String, newShift: String, newDisplayName: String? = null, snoozeCount: Int? = null, snoozeInterval: Int? = null, identity: String? = null) = viewModelScope.launch {
+        val updated = alarm.copy(
+            time = newTime,
+            shift = newShift,
+            displayName = newDisplayName,
+            snoozeCount = snoozeCount ?: alarm.snoozeCount,
+            snoozeInterval = snoozeInterval ?: alarm.snoozeInterval,
+            identity = identity ?: alarm.identity
+        )
+        repository.upsert(updated)
+        if (updated.enabled) {
+            scheduler.schedule(updated)
+            notifyNextAlarm(updated)
+        } else {
+            scheduler.cancel(updated)
+        }
+    }
+
+    fun addAlarm(time: String, shift: String, displayName: String? = null, snoozeCount: Int = 3, snoozeInterval: Int = 5, identity: String = "LONG_DAY") = viewModelScope.launch {
+        val newAlarm = AlarmTimeEntity(time = time, shift = shift, displayName = displayName, snoozeCount = snoozeCount, snoozeInterval = snoozeInterval, identity = identity)
         repository.upsert(newAlarm)
         scheduler.schedule(newAlarm)
         notifyNextAlarm(newAlarm)
+    }
 
+    fun deleteAlarm(alarm: AlarmTimeEntity) = viewModelScope.launch {
+        repository.delete(alarm)
+        scheduler.cancel(alarm)
     }
 
     private suspend fun notifyNextAlarm(entity: AlarmTimeEntity) {

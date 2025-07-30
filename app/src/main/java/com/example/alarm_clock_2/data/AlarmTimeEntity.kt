@@ -9,5 +9,9 @@ data class AlarmTimeEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     @ColumnInfo(name = "shift") val shift: String,
     @ColumnInfo(name = "time") val time: String,
-    @ColumnInfo(name = "enabled") val enabled: Boolean = true
-) 
+    @ColumnInfo(name = "enabled") val enabled: Boolean = true,
+    @ColumnInfo(name = "display_name") val displayName: String? = null,
+    @ColumnInfo(name = "snooze_count") val snoozeCount: Int = 3,
+    @ColumnInfo(name = "snooze_interval") val snoozeInterval: Int = 5,
+    @ColumnInfo(name = "identity") val identity: String = "LONG_DAY"
+)
