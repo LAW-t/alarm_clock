@@ -19,6 +19,7 @@ import com.example.alarm_clock_2.data.AlarmTimeEntity
 import android.os.Build
 import android.util.Log
 import com.example.alarm_clock_2.MainActivity
+import com.example.alarm_clock_2.util.Constants
 
 /**
  * Wraps [AlarmManager] to schedule/cancel alarms associated with [AlarmTimeEntity].
@@ -36,31 +37,40 @@ class AlarmScheduler @Inject constructor(
     private val alarmManager =
         context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-    fun schedule(entity: AlarmTimeEntity) {
+    suspend fun schedule(entity: AlarmTimeEntity) {
         if (!entity.enabled) {
             Log.d(TAG, "Skip schedule: alarm ${entity.id} disabled")
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
             Log.w(TAG, "Exact alarm permission denied; cannot schedule id=${entity.id}")
-            return
+            throw SecurityException(com.example.alarm_clock_2.util.Constants.ERROR_PERMISSION_DENIED)
         }
-        val localTime = parseTime(entity.time) ?: return
-        val triggerAt = computeNextTriggerMillisForShift(localTime, entity.shift)
-        val humanTime = java.time.Instant.ofEpochMilli(triggerAt)
-            .atZone(java.time.ZoneId.systemDefault())
-            .toLocalDateTime()
-        Log.d(TAG, "Scheduling alarm id=${entity.id} shift=${entity.shift} at ${humanTime} (millis=${triggerAt})")
 
-        val showIntent = buildActivityPendingIntent()
-        val operation = buildBroadcastPendingIntent(entity)
+        val localTime = parseTime(entity.time) ?: run {
+            Log.e(TAG, "Invalid time format: ${entity.time}")
+            throw IllegalArgumentException(com.example.alarm_clock_2.util.Constants.ERROR_INVALID_TIME_FORMAT)
+        }
+
         try {
+            val triggerAt = computeNextTriggerMillisForShift(localTime, entity.shift)
+            val humanTime = java.time.Instant.ofEpochMilli(triggerAt)
+                .atZone(java.time.ZoneId.systemDefault())
+                .toLocalDateTime()
+            Log.d(TAG, "Scheduling alarm id=${entity.id} shift=${entity.shift} at ${humanTime} (millis=${triggerAt})")
+
+            val showIntent = buildActivityPendingIntent()
+            val operation = buildBroadcastPendingIntent(entity)
+
             val info = android.app.AlarmManager.AlarmClockInfo(triggerAt, showIntent)
             alarmManager.setAlarmClock(info, operation)
             Log.d(TAG, "Alarm set via AlarmManager for id=${entity.id}")
         } catch (e: SecurityException) {
-            // Permission not granted; skip scheduling
-            Log.e(TAG, "SecurityException scheduling alarm id=${entity.id}: $e")
+            Log.e(TAG, "SecurityException scheduling alarm id=${entity.id}", e)
+            throw e
+        } catch (e: Exception) {
+            Log.e(TAG, "Error scheduling alarm id=${entity.id}", e)
+            throw RuntimeException(com.example.alarm_clock_2.util.Constants.ERROR_SCHEDULE_FAILED, e)
         }
     }
 
@@ -74,10 +84,15 @@ class AlarmScheduler @Inject constructor(
      * Returns epoch millis of the next time this alarm will fire, or null if unable to compute
      * (e.g. invalid time format or alarm disabled).
      */
-    fun nextTriggerMillis(entity: AlarmTimeEntity): Long? {
+    suspend fun nextTriggerMillis(entity: AlarmTimeEntity): Long? {
         if (!entity.enabled) return null
         val localTime = parseTime(entity.time) ?: return null
-        return computeNextTriggerMillisForShift(localTime, entity.shift)
+        return try {
+            computeNextTriggerMillisForShift(localTime, entity.shift)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error computing next trigger millis for alarm ${entity.id}", e)
+            null
+        }
     }
 
     /** The PendingIntent that fires when alarm is triggered. */
@@ -112,47 +127,46 @@ class AlarmScheduler @Inject constructor(
         LocalTime.parse(time)
     }.getOrNull()
 
-    private fun computeNextTriggerMillisForShift(time: LocalTime, shiftStr: String): Long {
+    private suspend fun computeNextTriggerMillisForShift(time: LocalTime, shiftStr: String): Long {
         val desiredShift = runCatching { Shift.valueOf(shiftStr) }.getOrElse { return computeTomorrow(time) }
 
-        // Fetch current settings synchronously
-        val identityStr: String
-        val idx43: Int
-        val base43: String
-        val idx42: Int
-        val base42: String
-        runBlocking {
-            identityStr = settings.identityFlow.first()
-            idx43 = settings.fourThreeIndexFlow.first()
-            base43 = settings.fourThreeBaseDateFlow.first()
-            idx42 = settings.fourTwoIndexFlow.first()
-            base42 = settings.fourTwoBaseDateFlow.first()
-        }
-        val identity = runCatching { IdentityType.valueOf(identityStr) }.getOrDefault(IdentityType.LONG_DAY)
-        val (baseIndex, baseDateStr) = when (identity) {
-            IdentityType.FOUR_THREE -> idx43 to base43
-            IdentityType.FOUR_TWO -> idx42 to base42
-            else -> 0 to LocalDate.now().toString()
-        }
-        val baseDate = runCatching { LocalDate.parse(baseDateStr) }.getOrElse { LocalDate.now() }
-        val config = ShiftConfig(identity, baseDate, baseIndex)
+        return try {
+            // Fetch current settings asynchronously
+            val identityStr = settings.identityFlow.first()
+            val idx43 = settings.fourThreeIndexFlow.first()
+            val base43 = settings.fourThreeBaseDateFlow.first()
+            val idx42 = settings.fourTwoIndexFlow.first()
+            val base42 = settings.fourTwoBaseDateFlow.first()
 
-        // search next 60 days for matching shift
-        for (offset in 0..60) {
-            val date = LocalDate.now().plusDays(offset.toLong())
-            if (ShiftCalculator.calculate(date, config) == desiredShift) {
-                var triggerDate = date
-                if (desiredShift == Shift.NIGHT) {
-                    triggerDate = date.minusDays(1)
-                }
-                val dt = LocalDateTime.of(triggerDate, time)
-                if (dt.isAfter(LocalDateTime.now())) {
-                    return dt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val identity = runCatching { IdentityType.valueOf(identityStr) }.getOrDefault(IdentityType.LONG_DAY)
+            val (baseIndex, baseDateStr) = when (identity) {
+                IdentityType.FOUR_THREE -> idx43 to base43
+                IdentityType.FOUR_TWO -> idx42 to base42
+                else -> 0 to LocalDate.now().toString()
+            }
+            val baseDate = runCatching { LocalDate.parse(baseDateStr) }.getOrElse { LocalDate.now() }
+            val config = ShiftConfig(identity, baseDate, baseIndex)
+
+            // search next days for matching shift
+            for (offset in 0..Constants.ALARM_SEARCH_DAYS) {
+                val date = LocalDate.now().plusDays(offset.toLong())
+                if (ShiftCalculator.calculate(date, config) == desiredShift) {
+                    var triggerDate = date
+                    if (desiredShift == Shift.NIGHT) {
+                        triggerDate = date.minusDays(1)
+                    }
+                    val dt = LocalDateTime.of(triggerDate, time)
+                    if (dt.isAfter(LocalDateTime.now())) {
+                        return dt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    }
                 }
             }
+            // fallback tomorrow
+            computeTomorrow(time)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error computing next trigger time for shift $shiftStr", e)
+            computeTomorrow(time)
         }
-        // fallback tomorrow
-        return computeTomorrow(time)
     }
 
     private fun computeTomorrow(time: LocalTime): Long {

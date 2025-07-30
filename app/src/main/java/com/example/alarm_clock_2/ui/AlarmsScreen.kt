@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.commandiron.wheel_picker_compose.WheelTimePicker
+
 import com.commandiron.wheel_picker_compose.core.WheelPickerDefaults
 import com.example.alarm_clock_2.shift.IdentityType
 import kotlinx.coroutines.launch
@@ -226,7 +227,7 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
             onDismiss = { showAddDialog = false },
             onConfirm = { time, shift, snoozeCount, snoozeInterval ->
                 val displayName = labelMap[shift]
-                viewModel.addAlarm(time, shift, displayName, snoozeCount, snoozeInterval, uiState.identity.name)
+                viewModel.addAlarm(time, shift, displayName, snoozeCount, snoozeInterval)
                 showAddDialog = false
             }
         )
@@ -243,7 +244,7 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
             },
             onConfirm = { time, shift, snoozeCount, snoozeInterval ->
                 val displayName = labelMap[shift]
-                viewModel.updateAlarm(editingAlarm!!, time, shift, displayName, snoozeCount, snoozeInterval, uiState.identity.name)
+                viewModel.updateAlarm(editingAlarm!!, time, shift, displayName, snoozeCount, snoozeInterval)
                 showEditDialog = false
                 editingAlarm = null
             }
