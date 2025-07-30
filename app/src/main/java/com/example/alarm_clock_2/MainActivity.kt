@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -47,6 +48,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.navigation.compose.navigation
 import androidx.compose.ui.platform.LocalDensity
@@ -90,7 +93,12 @@ class MainActivity : ComponentActivity() {
                     )
                     Scaffold(
                         bottomBar = {
-                            NavigationBar {
+                            // iOS风格的底部导航栏
+                            NavigationBar(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                tonalElevation = 8.dp
+                            ) {
                                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                                 val currentRoute = navBackStackEntry?.destination?.route
                                 items.forEach { screen ->
@@ -105,12 +113,34 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             }
                                         },
-                                        icon = { Icon(screen.icon, contentDescription = null) },
-                                        label = { Text(screen.label) }
+                                        icon = {
+                                            Icon(
+                                                screen.icon,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(24.dp)
+                                            )
+                                        },
+                                        label = {
+                                            Text(
+                                                screen.label,
+                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                    fontWeight = FontWeight.Medium,
+                                                    fontSize = 12.sp
+                                                )
+                                            )
+                                        },
+                                        colors = NavigationBarItemDefaults.colors(
+                                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                                        )
                                     )
                                 }
                             }
-                        }
+                        },
+                        containerColor = MaterialTheme.colorScheme.background
                     ) { innerPadding ->
                         // Developer info dialog moved to Settings screen
                         Surface(modifier = Modifier.padding(innerPadding), color = MaterialTheme.colorScheme.background) {

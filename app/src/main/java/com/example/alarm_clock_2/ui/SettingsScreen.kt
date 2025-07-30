@@ -1,12 +1,15 @@
 package com.example.alarm_clock_2.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.*  // 导入 remember, mutableStateOf, getValue, setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.alarm_clock_2.shift.IdentityType
 import android.app.Activity
@@ -50,41 +53,89 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp) // Use spacedBy for consistent spacing
+            .padding(20.dp), // iOS风格的边距
+        verticalArrangement = Arrangement.spacedBy(28.dp) // 增加间距
     ) {
-        Column {
-            Text(text = "身份选择", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
+        // 页面标题
+        Text(
+            text = "设置",
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 28.sp
+            ),
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        // iOS风格的设置分组卡片
+        SettingsCard(title = "身份选择") {
             IdentityRadioGroup(selected = ui.identity, onSelect = viewModel::onIdentitySelected)
         }
 
+        // 班次配置（如果需要）
         when (ui.identity) {
-            IdentityType.FOUR_THREE -> FourThreeShiftPicker(ui.fourThreeIndex, viewModel::onFourThreeIndexChanged)
-            IdentityType.FOUR_TWO -> FourTwoShiftPicker(ui.fourTwoIndex, viewModel::onFourTwoIndexChanged)
-            else -> {} // No extra spacer needed here
+            IdentityType.FOUR_THREE -> {
+                SettingsCard(title = "四班三运转配置") {
+                    FourThreeShiftPicker(ui.fourThreeIndex, viewModel::onFourThreeIndexChanged)
+                }
+            }
+            IdentityType.FOUR_TWO -> {
+                SettingsCard(title = "四班两运转配置") {
+                    FourTwoShiftPicker(ui.fourTwoIndex, viewModel::onFourTwoIndexChanged)
+                }
+            }
+            else -> {} // 长白班不需要额外配置
         }
 
-        // 铃声选择
-        RingtonePickerRow(ui.ringtoneUri) { viewModel.onRingtoneSelected(it) }
+        // 闹钟设置
+        SettingsCard(title = "闹钟设置") {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // 铃声选择
+                RingtonePickerRow(ui.ringtoneUri) { viewModel.onRingtoneSelected(it) }
 
-        // 播放模式选择
-        PlayModeRadioGroup(selected = ui.playMode, onSelect = viewModel::onPlayModeSelected)
+                // 播放模式选择
+                PlayModeRadioGroup(selected = ui.playMode, onSelect = viewModel::onPlayModeSelected)
 
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "法定节假日休息")
-            Spacer(Modifier.width(8.dp))
-            Switch(checked = ui.holidayRest, onCheckedChange = viewModel::onHolidayRestChanged)
+                // 节假日设置
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "法定节假日休息",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 17.sp
+                        )
+                    )
+                    Switch(
+                        checked = ui.holidayRest,
+                        onCheckedChange = viewModel::onHolidayRestChanged,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary,
+                            uncheckedThumbColor = Color.White,
+                            uncheckedTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        )
+                    )
+                }
+            }
         }
 
-        // 当前版本 & 更新
-        VersionRow(viewModel = viewModel)
+        // 应用信息
+        SettingsCard(title = "应用信息") {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                // 当前版本 & 更新
+                VersionRow(viewModel = viewModel)
 
-        // 开发者信息
-        DeveloperInfoRow()
+                // 开发者信息
+                DeveloperInfoRow()
+            }
+        }
 
-        // Add extra space at the bottom
-        Spacer(Modifier.height(24.dp))
+        // 底部间距
+        Spacer(Modifier.height(32.dp))
     }
 }
 
@@ -360,3 +411,35 @@ private fun DeveloperInfoRow() {
     }
 }
 
+// iOS风格的设置卡片组件
+@Composable
+private fun SettingsCard(
+    title: String,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 2.dp
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 18.sp
+                ),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            content()
+        }
+    }
+}

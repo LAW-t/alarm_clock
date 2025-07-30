@@ -1,16 +1,45 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.Alarm_clock_2" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <!-- Primary brand color. -->
-        <item name="colorPrimary">@color/purple_500</item>
-        <item name="colorPrimaryVariant">@color/purple_700</item>
+    <!-- iOS Style Light Theme -->
+    <style name="Theme.Alarm_clock_2" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Primary brand color - iOS Blue -->
+        <item name="colorPrimary">@color/ios_blue</item>
         <item name="colorOnPrimary">@color/white</item>
-        <!-- Secondary brand color. -->
-        <item name="colorSecondary">@color/teal_200</item>
-        <item name="colorSecondaryVariant">@color/teal_700</item>
-        <item name="colorOnSecondary">@color/black</item>
-        <!-- Status bar color. -->
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
-        <!-- Customize your theme here. -->
+        <item name="colorPrimaryContainer">@color/ios_blue_light</item>
+        <item name="colorOnPrimaryContainer">@color/ios_blue_dark</item>
+
+        <!-- Secondary colors -->
+        <item name="colorSecondary">@color/ios_teal</item>
+        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorSecondaryContainer">@color/ios_mint</item>
+        <item name="colorOnSecondaryContainer">@color/ios_teal</item>
+
+        <!-- Background colors -->
+        <item name="android:colorBackground">@color/ios_background_primary</item>
+        <item name="colorSurface">@color/ios_surface_primary</item>
+        <item name="colorSurfaceVariant">@color/ios_surface_secondary</item>
+        <item name="colorOnBackground">@color/ios_text_primary</item>
+        <item name="colorOnSurface">@color/ios_text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/ios_text_secondary</item>
+
+        <!-- Error colors -->
+        <item name="colorError">@color/ios_red</item>
+        <item name="colorOnError">@color/white</item>
+        <item name="colorErrorContainer">@color/ios_red</item>
+        <item name="colorOnErrorContainer">@color/white</item>
+
+        <!-- Outline colors -->
+        <item name="colorOutline">@color/ios_separator_opaque</item>
+        <item name="colorOutlineVariant">@color/ios_separator_non_opaque</item>
+
+        <!-- Status bar -->
+        <item name="android:statusBarColor">@color/ios_background_primary</item>
+        <item name="android:windowLightStatusBar">true</item>
+
+        <!-- Navigation bar -->
+        <item name="android:navigationBarColor">@color/ios_background_primary</item>
+        <item name="android:windowLightNavigationBar">true</item>
+
+        <!-- Window background -->
+        <item name="android:windowBackground">@color/ios_background_primary</item>
     </style>
 </resources>
