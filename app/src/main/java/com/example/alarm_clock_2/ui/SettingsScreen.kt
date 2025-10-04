@@ -248,28 +248,55 @@ private fun ShiftOptionRow(
 
 @Composable
 private fun RingtonePickerRow(currentUri: String, onUriSelected: (String) -> Unit) {
+    val context = LocalContext.current
+    val ringtoneName = remember(currentUri, context) { resolveRingtoneName(context, currentUri) }
+
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val uri: Uri? = result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
             if (uri != null) onUriSelected(uri.toString())
         }
     }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(text = "铃声")
-        Spacer(Modifier.width(8.dp))
-        Button(onClick = {
-            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
-                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
-                if (currentUri.isNotBlank()) {
-                    putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(currentUri))
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "铃声")
+            Spacer(Modifier.width(8.dp))
+            Button(onClick = {
+                val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM)
+                    putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                    if (currentUri.isNotBlank()) {
+                        putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, Uri.parse(currentUri))
+                    }
                 }
+                launcher.launch(intent)
+            }) {
+                Text("选择")
             }
-            launcher.launch(intent)
-        }) {
-            Text("选择")
         }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = "当前：$ringtoneName",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
+}
+
+private fun resolveRingtoneName(context: android.content.Context, uriString: String): String {
+    val fallback = "系统默认"
+
+    if (uriString.isBlank()) {
+        return runCatching {
+            val defaultUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            RingtoneManager.getRingtone(context, defaultUri)?.getTitle(context)
+        }.getOrNull()?.takeIf { it.isNotBlank() } ?: fallback
+    }
+
+    return runCatching {
+        val uri = Uri.parse(uriString)
+        RingtoneManager.getRingtone(context, uri)?.getTitle(context)
+    }.getOrNull()?.takeIf { it.isNotBlank() } ?: fallback
 }
 
 @OptIn(ExperimentalLayoutApi::class)
