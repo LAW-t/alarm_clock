@@ -71,19 +71,32 @@ class ShiftAlarmWorker(
         val baseDate = runCatching { LocalDate.parse(baseDateStr) }.getOrElse { LocalDate.now() }
         val config = ShiftConfig(identity, baseDate, baseIndex)
 
-        var todayShift = ShiftCalculator.calculate(LocalDate.now().plusDays(1), config)
+        val today = LocalDate.now()
+        val tomorrow = today.plusDays(1)
 
-        // 若开启“节假日休息”且今天为法定休息日，则强制休息
+        var todayShift = ShiftCalculator.calculate(today, config)
+        var tomorrowShift = ShiftCalculator.calculate(tomorrow, config)
+
+        // 若开启“节假日休息”且当天为法定休息日，则视为休息班次
         val holidayRestEnabled = settings.holidayRestFlow.first()
         if (holidayRestEnabled) {
-            val isOff = holidayRepo.isOffDay(LocalDate.now().plusDays(1).toString())
-            if (isOff) todayShift = Shift.OFF
+            if (holidayRepo.isOffDay(today.toString())) {
+                todayShift = Shift.OFF
+            }
+            if (holidayRepo.isOffDay(tomorrow.toString())) {
+                tomorrowShift = Shift.OFF
+            }
+        }
+
+        val activeShifts = buildSet {
+            if (todayShift != Shift.OFF) add(todayShift.name)
+            if (tomorrowShift != Shift.OFF) add(tomorrowShift.name)
         }
 
         // 2. 更新闹钟表
         val alarms = repo.getAlarms().first()
         alarms.forEach { alarm ->
-            if (alarm.shift == todayShift.name) {
+            if (alarm.shift in activeShifts) {
                 ensureEnabledAndScheduled(alarm)
             } else {
                 ensureDisabledAndCancelled(alarm)
@@ -92,19 +105,15 @@ class ShiftAlarmWorker(
     }
 
     private suspend fun ensureEnabledAndScheduled(alarm: AlarmTimeEntity) {
-        val entity = if (!alarm.enabled) {
-            val updated = alarm.copy(enabled = true)
-            repo.upsert(updated)
-            updated
-        } else alarm
-        scheduler.schedule(entity)
+        if (alarm.enabled) {
+            scheduler.schedule(alarm)
+        } else {
+            scheduler.cancel(alarm)
+        }
     }
 
     private suspend fun ensureDisabledAndCancelled(alarm: AlarmTimeEntity) {
         scheduler.cancel(alarm)
-        if (alarm.enabled) {
-            repo.upsert(alarm.copy(enabled = false))
-        }
     }
 
     companion object {

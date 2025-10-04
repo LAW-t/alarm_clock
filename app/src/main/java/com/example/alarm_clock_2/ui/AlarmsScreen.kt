@@ -431,13 +431,14 @@ private fun AlarmEditBottomSheet(
     val scope = rememberCoroutineScope()
 
     // 初始化状态
+    val defaultTime = remember { LocalTime.now().withSecond(0).withNano(0) }
     var selectedTime by remember {
         mutableStateOf(
             if (isEditing && alarm!!.time.matches(Regex("\\d{2}:\\d{2}"))) {
                 val parts = alarm.time.split(":")
                 LocalTime.of(parts[0].toInt(), parts[1].toInt())
             } else {
-                LocalTime.of(8, 0)
+                defaultTime
             }
         )
     }
