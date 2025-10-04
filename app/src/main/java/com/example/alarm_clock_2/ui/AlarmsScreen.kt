@@ -5,35 +5,37 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.outlined.AccessTime
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.commandiron.wheel_picker_compose.WheelTimePicker
-
-import com.commandiron.wheel_picker_compose.core.WheelPickerDefaults
+ 
 import com.example.alarm_clock_2.shift.IdentityType
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import java.time.temporal.ChronoUnit
 import java.time.LocalTime
 import android.widget.Toast
 import kotlin.math.roundToInt
@@ -68,13 +70,6 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
         "AFTERNOON" to "中班",
         "NIGHT" to "晚班"
     )
-
-    // 根据身份生成需要展示的班次代码
-    val requiredShiftCodes: List<String> = when (uiState.identity) {
-        IdentityType.LONG_DAY -> listOf("DAY")
-        IdentityType.FOUR_THREE -> listOf("MORNING", "AFTERNOON", "NIGHT")
-        IdentityType.FOUR_TWO -> listOf("MORNING", "NIGHT")
-    }
 
     // 获取当前用户身份可用的班次类型选项
     fun getAvailableShiftOptions(identity: IdentityType): List<Pair<String, String>> {
@@ -111,131 +106,172 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
     val currentTime by produceState(initialValue = LocalTime.now()) {
         while (true) {
             value = LocalTime.now()
-            delay(60_000)
+            delay(10_000)
         }
     }
 
-    val upcomingAlarmId = remember(allAlarms, currentTime) {
-        allAlarms
-            .filter { it.entity.enabled }
-            .mapNotNull { item ->
-                minutesUntilNextAlarm(item.entity.time, currentTime)?.let { minutes ->
-                    item.entity.id to minutes
-                }
-            }
-            .minByOrNull { it.second }
-            ?.first
+    val nowMillis by produceState(initialValue = System.currentTimeMillis()) {
+        while (true) {
+            value = System.currentTimeMillis()
+            delay(10_000)
+        }
     }
 
+    val refreshTick = nowMillis / 600_000L
+    LaunchedEffect(refreshTick) {
+        viewModel.refreshNextTriggerTimes()
+    }
 
+    val nextTriggerMap = viewModel.nextTriggerMap.collectAsState().value
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "闹钟",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 28.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onBackground
+    val upcomingAlarmId = remember(nextTriggerMap, nowMillis) {
+        nextTriggerMap
+            .filterValues { it != null && it > nowMillis }
+            .minByOrNull { it.value!! }
+            ?.key
+    }
+
+    val colorScheme = MaterialTheme.colorScheme
+    val gradientBrush = Brush.verticalGradient(
+        colors = listOf(
+            colorScheme.primary.copy(alpha = 0.12f),
+            colorScheme.background
+        )
+    )
+
+    val greetingText = remember(currentTime) {
+        when (currentTime.hour) {
+            in 5..10 -> "早安，开启充满活力的一天"
+            in 11..13 -> "午间小憩也别忘了定闹钟"
+            in 14..18 -> "午后时光，保持专注"
+            else -> "夜深了，别忘了好好休息"
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(gradientBrush)
+    ) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                "闹钟",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 28.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                greetingText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground
                     )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
                 )
-            )
-        },
-        floatingActionButton = {
-            // iOS风格的浮动按钮
-            FloatingActionButton(
-                onClick = { showAddDialog = true },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(60.dp),
-                shape = CircleShape,
-                elevation = FloatingActionButtonDefaults.elevation(
-                    defaultElevation = 8.dp,
-                    pressedElevation = 12.dp
-                )
-            ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "添加闹钟",
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        },
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
-        if (allAlarms.isEmpty()) {
-            // iOS风格的空状态
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier.padding(horizontal = 32.dp)
+            },
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(60.dp),
+                    shape = CircleShape,
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 8.dp,
+                        pressedElevation = 12.dp
+                    )
                 ) {
-                    // 大号图标
                     Icon(
-                        Icons.Default.Alarm,
-                        contentDescription = null,
-                        modifier = Modifier.size(80.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        "暂无闹钟",
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 22.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        "点击右下角的 + 按钮\n添加您的第一个闹钟",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 17.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        textAlign = TextAlign.Center,
-                        lineHeight = 24.sp
+                        Icons.Default.Add,
+                        contentDescription = "添加闹钟",
+                        modifier = Modifier.size(28.dp)
                     )
                 }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 20.dp), // iOS风格的边距
-                verticalArrangement = Arrangement.spacedBy(16.dp), // 增加间距
-                contentPadding = PaddingValues(vertical = 20.dp) // 增加上下边距
-            ) {
-                items(items = allAlarms, key = { it.entity.id }) { item ->
-                    SwipeToDeleteAlarmCard(
-                        alarm = item.entity,
-                        label = item.label,
-                        isUpcoming = item.entity.id == upcomingAlarmId,
-                        onEdit = {
-                            editingAlarm = item.entity
-                            showEditDialog = true
-                        },
-                        onToggle = {
-                            viewModel.toggleEnabled(item.entity)
-                        },
-                        onDelete = {
-                            viewModel.deleteAlarm(item.entity)
-                        }
-                    )
+            },
+            containerColor = Color.Transparent
+        ) { innerPadding ->
+            if (allAlarms.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Alarm,
+                            contentDescription = null,
+                            modifier = Modifier.size(80.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(
+                            "暂无闹钟",
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 22.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "点击右下角的 + 按钮\n添加您的第一个闹钟",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 17.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                            textAlign = TextAlign.Center,
+                            lineHeight = 24.sp
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    contentPadding = PaddingValues(vertical = 24.dp)
+                ) {
+                    items(items = allAlarms, key = { it.entity.id }) { item ->
+                        SwipeToDeleteAlarmCard(
+                            alarm = item.entity,
+                            label = item.label,
+                            isUpcoming = item.entity.id == upcomingAlarmId,
+                            nextTriggerMillis = nextTriggerMap[item.entity.id],
+                            currentTimeMillis = nowMillis,
+                            onEdit = {
+                                editingAlarm = item.entity
+                                showEditDialog = true
+                            },
+                            onToggle = {
+                                viewModel.toggleEnabled(item.entity)
+                            },
+                            onDelete = {
+                                viewModel.deleteAlarm(item.entity)
+                            }
+                        )
+                    }
+
+                    item("alarms_bottom_spacer") {
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
                 }
             }
         }
@@ -280,6 +316,8 @@ private fun SwipeToDeleteAlarmCard(
     alarm: com.example.alarm_clock_2.data.AlarmTimeEntity,
     label: String,
     isUpcoming: Boolean,
+    nextTriggerMillis: Long?,
+    currentTimeMillis: Long,
     onEdit: () -> Unit,
     onToggle: () -> Unit,
     onDelete: () -> Unit
@@ -339,6 +377,8 @@ private fun SwipeToDeleteAlarmCard(
             alarm = alarm,
             label = label,
             isUpcoming = isUpcoming,
+            nextTriggerMillis = nextTriggerMillis,
+            currentTimeMillis = currentTimeMillis,
             onEdit = onEdit,
             onToggle = onToggle
         )
@@ -350,14 +390,20 @@ private fun ModernAlarmCard(
     alarm: com.example.alarm_clock_2.data.AlarmTimeEntity,
     label: String,
     isUpcoming: Boolean,
+    nextTriggerMillis: Long?,
+    currentTimeMillis: Long,
     onEdit: () -> Unit,
     onToggle: () -> Unit
 ) {
     val timeDisplay = alarm.time
-    val context = LocalContext.current
     val isEnabled = alarm.enabled
+    val remainingMillis = if (isEnabled) {
+        nextTriggerMillis?.minus(currentTimeMillis)?.takeIf { it > 0 }
+    } else {
+        null
+    }
+    val remainingDescription = remainingMillis?.let { formatDuration(it) }
 
-    // iOS风格的卡片设计
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -383,10 +429,25 @@ private fun ModernAlarmCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp), // 增加内边距
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 24.dp, vertical = 20.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .height(72.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(
+                        if (isEnabled) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)
+                        }
+                    )
+            )
+
+            Spacer(modifier = Modifier.width(16.dp))
+
             Column(
                 modifier = Modifier.weight(1f)
             ) {
@@ -404,12 +465,11 @@ private fun ModernAlarmCard(
                     Spacer(modifier = Modifier.height(4.dp))
                 }
 
-                // 时间显示 - 更大更醒目
                 Text(
                     text = timeDisplay,
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 36.sp // iOS风格的大字体
+                        fontSize = 36.sp
                     ),
                     color = if (isEnabled) {
                         MaterialTheme.colorScheme.onSurface
@@ -417,40 +477,84 @@ private fun ModernAlarmCard(
                         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     }
                 )
-                Spacer(modifier = Modifier.height(8.dp))
 
-                // 班次标签
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = if (isEnabled) {
+                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.65f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    }
                 ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Medium
-                        ),
-                        color = if (isEnabled) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                        }
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Alarm,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (isEnabled) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (isEnabled) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            }
+                        )
+                    }
                 }
 
-                // 如果有重复设置，显示额外信息
-                if (alarm.snoozeCount > 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "重复 ${alarm.snoozeCount} 次，间隔 ${alarm.snoozeInterval} 分钟",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontSize = 13.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
+                AnimatedVisibility(visible = alarm.snoozeCount > 0) {
+                    Column {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "重复 ${alarm.snoozeCount} 次，间隔 ${alarm.snoozeInterval} 分钟",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 13.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+
+                AnimatedVisibility(visible = remainingDescription != null) {
+                    Column {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        remainingDescription?.let { description ->
+                            Text(
+                                text = "距离下一次响铃 ${description}后",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                AnimatedVisibility(visible = !isEnabled) {
+                    Column {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "闹钟已暂停",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
                 }
             }
 
-            // iOS风格的开关
+            Spacer(modifier = Modifier.width(16.dp))
+
             Switch(
                 checked = isEnabled,
                 onCheckedChange = { onToggle() },
@@ -466,7 +570,7 @@ private fun ModernAlarmCard(
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AlarmEditBottomSheet(
     alarm: com.example.alarm_clock_2.data.AlarmTimeEntity?,
@@ -476,335 +580,315 @@ private fun AlarmEditBottomSheet(
 ) {
     val isEditing = alarm != null
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val scope = rememberCoroutineScope()
 
-    // 初始化状态
     val defaultTime = remember { LocalTime.now().withSecond(0).withNano(0) }
-    var selectedTime by remember {
+    val initialTime = remember(alarm) {
+        if (isEditing && alarm!!.time.matches(Regex("\\d{2}:\\d{2}"))) {
+            val parts = alarm.time.split(":")
+            LocalTime.of(parts[0].toInt(), parts[1].toInt())
+        } else {
+            defaultTime
+        }
+    }
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialTime.hour,
+        initialMinute = initialTime.minute,
+        is24Hour = true
+    )
+
+    var selectedShift by remember(alarm, availableShiftOptions) {
         mutableStateOf(
-            if (isEditing && alarm!!.time.matches(Regex("\\d{2}:\\d{2}"))) {
-                val parts = alarm.time.split(":")
-                LocalTime.of(parts[0].toInt(), parts[1].toInt())
+            if (isEditing) {
+                alarm!!.shift
             } else {
-                defaultTime
+                availableShiftOptions.firstOrNull()?.first.orEmpty()
             }
         )
     }
 
-    var selectedShift by remember {
-        mutableStateOf(
-            if (isEditing) alarm!!.shift else availableShiftOptions.firstOrNull()?.first ?: ""
-        )
-    }
-
-    var snoozeCount by remember {
+    var snoozeCount by remember(alarm) {
         mutableStateOf(if (isEditing) alarm!!.snoozeCount else 3)
     }
 
-    var snoozeInterval by remember {
+    var snoozeInterval by remember(alarm) {
         mutableStateOf(if (isEditing) alarm!!.snoozeInterval else 5)
     }
 
-    var expanded by remember { mutableStateOf(false) }
-
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
+    
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        containerColor = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         dragHandle = {
-            // iOS风格的拖拽指示器
             Box(
                 modifier = Modifier
-                    .width(36.dp)
-                    .height(5.dp)
-                    .background(
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
-                        RoundedCornerShape(2.5.dp)
-                    )
+                    .padding(top = 12.dp)
+                    .size(width = 40.dp, height = 5.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f))
             )
         }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(28.dp)
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // 标题
-            Text(
-                text = if (isEditing) "编辑闹钟" else "添加闹钟",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            // iOS风格的班次类型选择
-            Card(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                ExposedDropdownMenuBox(
-                    expanded = expanded,
-                    onExpandedChange = { expanded = !expanded },
-                    modifier = Modifier.padding(4.dp)
-                ) {
-                    OutlinedTextField(
-                        value = availableShiftOptions.find { it.first == selectedShift }?.second ?: "",
-                        onValueChange = { },
-                        readOnly = true,
-                        label = {
-                            Text(
-                                "班次类型",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    fontWeight = FontWeight.Medium
-                                )
-                            )
-                        },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                        )
-                    )
+                Text(
+                    text = if (isEditing) "编辑闹钟" else "添加闹钟",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
 
-                    ExposedDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
+            // 时间选择放在最上面
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                tonalElevation = 2.dp,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            ) {
+                var inputMode by remember { mutableStateOf(true) }
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "选择时间",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                        TextButton(onClick = { inputMode = !inputMode }) {
+                            Icon(
+                                imageVector = if (inputMode) Icons.Outlined.AccessTime else Icons.Outlined.Edit,
+                                contentDescription = null
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = if (inputMode) "拨盘" else "键入")
+                        }
+                    }
+
+                    if (inputMode) {
+                        TimeInput(state = timePickerState)
+                    } else {
+                        TimePicker(state = timePickerState)
+                    }
+                }
+            }
+
+            if (availableShiftOptions.isNotEmpty()) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "提醒班次",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         availableShiftOptions.forEach { (code, name) ->
-                            DropdownMenuItem(
-                                text = {
+                            FilterChip(
+                                selected = selectedShift == code,
+                                onClick = { selectedShift = code },
+                                label = {
                                     Text(
-                                        name,
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontWeight = FontWeight.Medium
-                                        )
+                                        text = name,
+                                        style = MaterialTheme.typography.bodyMedium
                                     )
                                 },
-                                onClick = {
-                                    selectedShift = code
-                                    expanded = false
-                                }
+                                leadingIcon = if (selectedShift == code) {
+                                    {
+                                        Icon(
+                                            imageVector = Icons.Outlined.AccessTime,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                } else null,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = selectedShift == code,
+                                    borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                                    selectedBorderColor = MaterialTheme.colorScheme.secondary,
+                                    borderWidth = 1.dp,
+                                    selectedBorderWidth = 1.5.dp
+                                )
                             )
                         }
                     }
                 }
             }
 
-            // iOS风格的重复设置卡片
-            Card(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                shape = RoundedCornerShape(24.dp),
+                tonalElevation = 2.dp,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp)
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    // 重复响铃次数设置
-                    Text(
-                        text = "重复响铃次数",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Slider(
-                            value = snoozeCount.toFloat(),
-                            onValueChange = { snoozeCount = it.roundToInt() },
-                            valueRange = 0f..5f,
-                            steps = 4,
-                            modifier = Modifier.weight(1f),
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "重复提醒",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                             )
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(
-                            text = "$snoozeCount 次",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.width(50.dp)
-                        )
+                            Text(
+                                text = "调节贪睡次数与间隔",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    // 重复间隔时间设置
-                    Text(
-                        text = "重复间隔时间",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Slider(
-                            value = snoozeInterval.toFloat(),
-                            onValueChange = { snoozeInterval = it.roundToInt() },
-                            valueRange = 1f..10f,
-                            steps = 8,
-                            modifier = Modifier.weight(1f),
-                            colors = SliderDefaults.colors(
-                                thumbColor = MaterialTheme.colorScheme.primary,
-                                activeTrackColor = MaterialTheme.colorScheme.primary,
-                                inactiveTrackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                            )
-                        )
-                        Spacer(modifier = Modifier.width(16.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = "$snoozeInterval 分钟",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Medium
-                            ),
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.width(60.dp)
+                            text = "重复响铃次数",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
                         )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Slider(
+                                value = snoozeCount.toFloat(),
+                                onValueChange = { snoozeCount = it.roundToInt() },
+                                valueRange = 0f..5f,
+                                steps = 4,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = "$snoozeCount 次",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "重复间隔时间",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Medium)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Slider(
+                                value = snoozeInterval.toFloat(),
+                                onValueChange = { snoozeInterval = it.roundToInt() },
+                                valueRange = 1f..10f,
+                                steps = 8,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Text(
+                                text = "$snoozeInterval 分钟",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
 
-            // iOS风格的时间选择器
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(20.dp)
-                ) {
-                    Text(
-                        text = "选择时间",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 18.sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+            
 
-                    val pickerWidth = screenWidth * 0.8f
-                    WheelTimePicker(
-                        modifier = Modifier.width(pickerWidth),
-                        size = DpSize(width = pickerWidth, height = 260.dp),
-                        startTime = selectedTime,
-                        selectorProperties = WheelPickerDefaults.selectorProperties(
-                            enabled = true,
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
-                            border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                        ),
-                        onSnappedTime = { time -> selectedTime = time }
-                    )
-                }
-            }
-
-            // iOS风格的操作按钮
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 取消按钮
-                Button(
+                OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 0.dp
-                    )
+                        .height(52.dp),
+                    shape = RoundedCornerShape(18.dp)
                 ) {
                     Text(
-                        "取消",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 17.sp
-                        )
+                        text = "取消",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
                     )
                 }
 
-                // 确定按钮
                 Button(
                     onClick = {
-                        val timeString = "%02d:%02d".format(selectedTime.hour, selectedTime.minute)
+                        val timeString = "%02d:%02d".format(timePickerState.hour, timePickerState.minute)
                         onConfirm(timeString, selectedShift, snoozeCount, snoozeInterval)
                     },
+                    enabled = selectedShift.isNotBlank(),
                     modifier = Modifier
                         .weight(1f)
-                        .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 2.dp,
-                        pressedElevation = 4.dp
-                    )
+                        .height(52.dp),
+                    shape = RoundedCornerShape(18.dp)
                 ) {
                     Text(
-                        "确定",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 17.sp
-                        )
+                        text = if (isEditing) "保存" else "确定",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
                     )
                 }
             }
 
-            // 底部间距
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(12.dp))
         }
     }
-
 }
 
-private fun minutesUntilNextAlarm(time: String, now: LocalTime): Long? {
-    return runCatching {
-        val targetTime = LocalTime.parse(time)
-        val diff = ChronoUnit.MINUTES.between(now, targetTime)
-        if (diff >= 0) diff else diff + 24 * 60
-    }.getOrNull()
+private fun formatDuration(remainingMillis: Long): String {
+    val totalMinutes = remainingMillis / 60_000
+    if (totalMinutes <= 0) return "不到 1 分钟"
+
+    val days = totalMinutes / (24 * 60)
+    val hours = (totalMinutes % (24 * 60)) / 60
+    val minutes = totalMinutes % 60
+
+    val parts = mutableListOf<String>()
+    if (days > 0) {
+        parts += "${days} 天"
+    }
+    if (hours > 0) {
+        parts += "${hours} 小时"
+    }
+    if (minutes > 0) {
+        parts += "${minutes} 分钟"
+    }
+
+    return parts.joinToString(separator = " ")
 }

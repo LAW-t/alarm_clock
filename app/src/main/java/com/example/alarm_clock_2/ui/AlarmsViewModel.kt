@@ -3,6 +3,7 @@ package com.example.alarm_clock_2.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.alarm_clock_2.data.AlarmTimeEntity
+import com.example.alarm_clock_2.data.SettingsDataStore
 import com.example.alarm_clock_2.data.model.AlarmDisplayItem
 import com.example.alarm_clock_2.data.model.AlarmListUiState
 import com.example.alarm_clock_2.data.model.AlarmState
@@ -12,6 +13,8 @@ import com.example.alarm_clock_2.domain.usecase.AlarmScheduleUseCase
 import com.example.alarm_clock_2.util.Constants
 import com.example.alarm_clock_2.util.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -19,7 +22,8 @@ import javax.inject.Inject
 @HiltViewModel
 class AlarmsViewModel @Inject constructor(
     private val alarmUseCase: AlarmUseCase,
-    private val scheduleUseCase: AlarmScheduleUseCase
+    private val scheduleUseCase: AlarmScheduleUseCase,
+    private val settingsDataStore: SettingsDataStore
 ) : ViewModel() {
 
     // ==================== UI状态管理 ====================
@@ -32,6 +36,11 @@ class AlarmsViewModel @Inject constructor(
 
     private val _errorFlow = MutableSharedFlow<String>()
     val errorFlow: SharedFlow<String> = _errorFlow
+
+    private val _nextTriggerMap = MutableStateFlow<Map<Int, Long?>>(emptyMap())
+    val nextTriggerMap: StateFlow<Map<Int, Long?>> = _nextTriggerMap.asStateFlow()
+
+    private var nextTriggerJob: Job? = null
 
     // ==================== 数据流 ====================
 
@@ -57,11 +66,46 @@ class AlarmsViewModel @Inject constructor(
                     state = if (alarmList.isEmpty()) AlarmState.NORMAL else AlarmState.NORMAL,
                     isLoading = false
                 )
+
+                refreshNextTriggers(alarmList.map { it.entity })
             }
+        }
+
+        viewModelScope.launch {
+            combine(
+                settingsDataStore.holidayRestFlow,
+                settingsDataStore.fourThreeIndexFlow,
+                settingsDataStore.fourThreeBaseDateFlow,
+                settingsDataStore.fourTwoIndexFlow,
+                settingsDataStore.fourTwoBaseDateFlow
+            ) { _, _, _, _, _ -> }
+                .collect {
+                    refreshNextTriggers(alarmDisplayItems.value.map { it.entity })
+                }
         }
 
         // 检查是否需要创建默认闹钟
         checkAndCreateDefaultAlarms()
+    }
+
+    private fun refreshNextTriggers(alarms: List<AlarmTimeEntity>) {
+        nextTriggerJob?.cancel()
+        nextTriggerJob = viewModelScope.launch(Dispatchers.IO) {
+            val resultMap = mutableMapOf<Int, Long?>()
+            alarms.forEach { alarm ->
+                val triggerMillis = if (alarm.enabled) {
+                    scheduleUseCase.getNextTriggerTime(alarm).getDataOrNull()
+                } else {
+                    null
+                }
+                resultMap[alarm.id] = triggerMillis
+            }
+            _nextTriggerMap.emit(resultMap)
+        }
+    }
+
+    fun refreshNextTriggerTimes() {
+        refreshNextTriggers(alarmDisplayItems.value.map { it.entity })
     }
 
     // ==================== 闹钟操作 ====================

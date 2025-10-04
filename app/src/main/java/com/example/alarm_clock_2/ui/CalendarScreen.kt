@@ -4,51 +4,56 @@ package com.example.alarm_clock_2.ui
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.rounded.Today
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.produceState
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.hilt.navigation.compose.hiltViewModel
 import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.border
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +64,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
     val totalPages = 240 // ±10 years window
     val initialPage = totalPages / 2
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { totalPages })
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
     // 当前 pager 页面对应的 YearMonth
     val currentMonth = baseMonth.plusMonths((pagerState.currentPage - initialPage).toLong())
@@ -67,74 +72,161 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
     // YearMonth Picker 弹窗
     var showYmPicker by remember { mutableStateOf(false) }
 
-    Column(
+    val primary = MaterialTheme.colorScheme.primary
+    val primaryContainer = MaterialTheme.colorScheme.primaryContainer
+    val backgroundColor = MaterialTheme.colorScheme.background
+    val backgroundBrush = remember(primary, primaryContainer, backgroundColor) {
+        Brush.verticalGradient(
+            colors = listOf(
+                primary.copy(alpha = 0.15f),
+                primaryContainer.copy(alpha = 0.08f),
+                backgroundColor
+            )
+        )
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(top = 16.dp, start = 8.dp, end = 8.dp),
+            .background(backgroundBrush)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
     ) {
-        // ----- Header -----
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            tonalElevation = 4.dp,
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
         ) {
-            Text(text = "<", modifier = Modifier.clickable {
-                scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) }
-            })
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "${currentMonth.year}年${currentMonth.monthValue}月",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.clickable { showYmPicker = true }
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "今", style = MaterialTheme.typography.bodyMedium, modifier = Modifier
-                    .clickable {
-                        scope.launch { pagerState.animateScrollToPage(initialPage) }
-                    })
-            }
-
-            Text(text = ">", modifier = Modifier.clickable {
-                scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(totalPages - 1)) }
-            })
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // ----- Day of week labels -----
-        // 宽度与下方日期网格保持一致
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-            val maxGridWidth = 600.dp
-            val gridWidth = if (maxWidth > maxGridWidth) maxGridWidth else maxWidth
-            val horizontalPad = (maxWidth - gridWidth) / 2
-
-            Row(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = horizontalPad, end = horizontalPad)
+                    .fillMaxSize()
+                    .padding(top = 24.dp, start = 20.dp, end = 20.dp, bottom = 16.dp)
             ) {
-                DayOfWeek.values().forEach {
-                    Text(
-                        text = it.getDisplayName(TextStyle.SHORT, Locale.CHINESE),
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                // ----- Header -----
+                val canGoPrevious = pagerState.currentPage > 0
+                val canGoNext = pagerState.currentPage < totalPages - 1
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) }
+                        },
+                        enabled = canGoPrevious
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ChevronLeft,
+                            contentDescription = "上一个月"
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            onClick = { showYmPicker = true },
+                            shape = RoundedCornerShape(22.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                            tonalElevation = 1.dp,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CalendarMonth,
+                                    contentDescription = null
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "${currentMonth.year}年${currentMonth.monthValue}月",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        AssistChip(
+                            onClick = {
+                                scope.launch { pagerState.animateScrollToPage(initialPage) }
+                            },
+                            label = { Text("回到本月") },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Rounded.Today,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
+                                labelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(totalPages - 1)) }
+                        },
+                        enabled = canGoNext
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.ChevronRight,
+                            contentDescription = "下一个月"
+                        )
+                    }
                 }
+
+                Spacer(Modifier.height(16.dp))
+
+                // ----- Day of week labels -----
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val maxGridWidth = 600.dp
+                    val gridWidth = if (maxWidth > maxGridWidth) maxGridWidth else maxWidth
+                    val horizontalPad = (maxWidth - gridWidth) / 2
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = horizontalPad, end = horizontalPad),
+                        shape = RoundedCornerShape(18.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            DayOfWeek.values().forEach { dayOfWeek ->
+                                val isWeekend = dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY
+                                Text(
+                                    text = dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.CHINESE),
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = if (isWeekend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // ----- Pager with Calendar grids -----
+                HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
+                    val month = baseMonth.plusMonths((page - initialPage).toLong())
+                    MonthGrid(month = month, viewModel = viewModel)
+                }
+
+                // ----- Legend -----
+                ShiftLegendRow()
             }
         }
-
-        Spacer(Modifier.height(4.dp))
-
-        // ----- Pager with Calendar grids -----
-        HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
-            val month = baseMonth.plusMonths((page - initialPage).toLong())
-            MonthGrid(month = month, viewModel = viewModel)
-        }
-
-        // ----- Legend -----
-        ShiftLegendRow()
     }
 
     if (showYmPicker) {
@@ -149,34 +241,45 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
 
 @Composable
 private fun ShiftLegendRow() {
-    Row(
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
+            .padding(top = 16.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
     ) {
-        com.example.alarm_clock_2.shift.Shift.values().forEach { shift ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .background(color = shiftColor(shift), shape = androidx.compose.foundation.shape.CircleShape)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(text = shiftLabel(shift), style = MaterialTheme.typography.labelSmall)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            com.example.alarm_clock_2.shift.Shift.values().forEach { shift ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(14.dp)
+                            .background(color = shiftAccent(shift), shape = CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = shiftLabel(shift),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     }
 }
 
-// Extracted color logic for reusability
-private fun shiftColor(shift: com.example.alarm_clock_2.shift.Shift): Color = when (shift) {
-    com.example.alarm_clock_2.shift.Shift.MORNING -> Color(0xFF3B82F6) // blue-500
-    com.example.alarm_clock_2.shift.Shift.AFTERNOON -> Color(0xFF059669) // emerald-600
-    com.example.alarm_clock_2.shift.Shift.NIGHT -> Color(0xFFF59E0B) // amber-500
-    com.example.alarm_clock_2.shift.Shift.DAY -> Color(0xFF4F46E5) // indigo-600
-    com.example.alarm_clock_2.shift.Shift.OFF -> Color(0xFF94A3B8) // slate-400
+private fun shiftAccent(shift: com.example.alarm_clock_2.shift.Shift): Color = when (shift) {
+    com.example.alarm_clock_2.shift.Shift.MORNING -> Color(0xFF2563EB)
+    com.example.alarm_clock_2.shift.Shift.AFTERNOON -> Color(0xFF059669)
+    com.example.alarm_clock_2.shift.Shift.NIGHT -> Color(0xFFF59E0B)
+    com.example.alarm_clock_2.shift.Shift.DAY -> Color(0xFF4F46E5)
+    com.example.alarm_clock_2.shift.Shift.OFF -> Color(0xFF64748B)
 }
 
 // Shift to simplified Chinese label
@@ -190,79 +293,110 @@ private fun shiftLabel(shift: com.example.alarm_clock_2.shift.Shift): String = w
 
 @Composable
 private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight: androidx.compose.ui.unit.Dp) {
-    if(day==null){ Spacer(modifier = Modifier.height(cellHeight)) ; return }
+    if (day == null) {
+        Spacer(modifier = Modifier.height(cellHeight))
+        return
+    }
     val context = androidx.compose.ui.platform.LocalContext.current
     val today = java.time.LocalDate.now()
     val isToday = day.date == today
 
-    val clickModifier = remember(day.date) {
-        Modifier.combinedClickable(onClick = {
-            day.holiday?.name?.let { name ->
-                android.widget.Toast.makeText(context, name, android.widget.Toast.LENGTH_SHORT).show()
-            }
-        })
+    val dayBackground = when {
+        isToday -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f)
+        day.isOffDay -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        else -> Color.Transparent
     }
 
-    Column(
+    val holiday = day.holiday
+
+    // 使用 Surface 承载点击与圆角，这样涟漪与点击区域与视觉圆角完全一致
+    Box(
         modifier = Modifier
-            .fillMaxWidth() // 撑满列宽，解决列间隙和对齐问题
-            // 使用最小高度，但允许内容撑开，避免 Chip 被裁剪
+            .fillMaxWidth()
             .heightIn(min = cellHeight)
-            .padding(vertical = 2.dp)   // 仅垂直内边距，避免列之间产生可见空隙
-            // 不再高亮节假日
-            .then(clickModifier),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .padding(all = 4.dp)
     ) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            onClick = {
+                day.holiday?.name?.let { name ->
+                    android.widget.Toast.makeText(context, name, android.widget.Toast.LENGTH_SHORT).show()
+                }
+            },
+            shape = RoundedCornerShape(14.dp),
+            color = dayBackground,
+            tonalElevation = 0.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
         // Date number with unified circle wrapper
         val fontScale = LocalConfiguration.current.fontScale
         val circleSize = (56.dp * fontScale).coerceIn(14.dp, 26.dp)
 
-        Box(
-            modifier = Modifier
-                .size(circleSize)
-                .then(
-                    if (isToday) Modifier.border(
-                        width = 1.5.dp,
-                        color = MaterialTheme.colorScheme.error,
-                        shape = androidx.compose.foundation.shape.CircleShape
-                    ) else Modifier
-                ),
-            contentAlignment = Alignment.Center
+        Surface(
+            modifier = Modifier.size(circleSize),
+            shape = CircleShape,
+            color = if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent,
+            tonalElevation = if (isToday) 3.dp else 0.dp
         ) {
-            Text(
-                text = day.date.dayOfMonth.toString(),
-                style = if (isToday) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-                color = if (isToday) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-            )
-
-            // Holiday dot indicator (top-right)
-            if (day.isOffDay) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .size(6.dp)
-                        .background(MaterialTheme.colorScheme.error, shape = androidx.compose.foundation.shape.CircleShape)
+            Box(contentAlignment = Alignment.Center) {
+                Text(
+                    text = day.date.dayOfMonth.toString(),
+                    style = if (isToday) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                    color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                 )
+
+                if (holiday != null && (day.isOffDay || day.workdayOverrideApplied)) {
+                    val indicatorBorder = if (isToday) {
+                        MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                    } else {
+                        MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                    }
+                    val dotColor = if (day.isOffDay) {
+                        // Off-day (休) -> red dot
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        // Adjusted workday (上班) -> primary dot
+                        MaterialTheme.colorScheme.primary
+                    }
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = (-2).dp, y = 2.dp) // move inward to avoid clipping
+                            .size(8.dp)
+                            .zIndex(1f)
+                            .background(dotColor, CircleShape)
+                            .border(0.75.dp, indicatorBorder, CircleShape)
+                    )
+                }
             }
         }
 
-        // 数字与农历/节假日文本之间的间距（稍微缩小）
-        Spacer(modifier = Modifier.height(1.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // Lunar day text (replace with first 2 chars of holiday name if present)
-        val lunarText = day.holiday?.name?.take(2) ?: day.lunarDay
+        val subText = when {
+            holiday == null -> day.lunarDay
+            day.isOffDay -> holiday.name.take(2)
+            day.workdayOverrideApplied -> "上班"
+            else -> day.lunarDay
+        }
         Text(
-            text = lunarText,
+            text = subText,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        // 农历/节假日文本与班次标签之间的间距
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(3.dp))
 
         // Shift label chip
         ShiftChip(shift = day.shift)
+            }
+        }
     }
 }
 
@@ -290,9 +424,10 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
             // 1. 决定行间距大小 (自适应，并限制在 2dp-8dp)
             val desiredGap = (maxHeight * 0.02f).coerceIn(2.dp, 8.dp)
             val totalGapHeight = desiredGap * 5 // 6行之间有5个间距
+            val verticalContainerPadding = 24.dp
 
             // 2. 用剩余空间计算单元格高度
-            val heightForCells = maxHeight - totalGapHeight
+            val heightForCells = (maxHeight - verticalContainerPadding - totalGapHeight).coerceAtLeast(0.dp)
             val rawHeight = if (heightForCells > 0.dp) heightForCells / 6 else 0.dp
 
             // 3. 应用最大/最小高度约束
@@ -318,20 +453,29 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
             val gridWidth = if (maxWidth > maxGridWidth) maxGridWidth else maxWidth
             val horizontalPad = (maxWidth - gridWidth) / 2
 
-            val scrollEnabled = (needHeight + totalGapHeight) > maxHeight
+            val scrollEnabled = (needHeight + totalGapHeight + verticalContainerPadding) > maxHeight
 
-            LazyColumn(
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = horizontalPad, end = horizontalPad),
-                verticalArrangement = Arrangement.spacedBy(desiredGap),
-                userScrollEnabled = scrollEnabled
+                shape = RoundedCornerShape(24.dp),
+                tonalElevation = 1.dp,
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)
             ) {
-                items(weeks) { week ->
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        week.forEach { d ->
-                            Box(modifier = Modifier.weight(1f)) {
-                                DayCell(day = d, cellHeight = cellHeight)
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(desiredGap),
+                    userScrollEnabled = scrollEnabled
+                ) {
+                    items(weeks) { week ->
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            week.forEach { d ->
+                                Box(modifier = Modifier.weight(1f)) {
+                                    DayCell(day = d, cellHeight = cellHeight)
+                                }
                             }
                         }
                     }
@@ -343,26 +487,20 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
 
 @Composable
 private fun ShiftChip(shift: com.example.alarm_clock_2.shift.Shift) {
-    // Color palette inspired by index.html tags
-    val bgColor = when (shift) {
-        com.example.alarm_clock_2.shift.Shift.MORNING -> Color(0xFF3B82F6) // blue-500
-        com.example.alarm_clock_2.shift.Shift.AFTERNOON -> Color(0xFF059669) // emerald-600
-        com.example.alarm_clock_2.shift.Shift.NIGHT -> Color(0xFFF59E0B) // amber-500
-        com.example.alarm_clock_2.shift.Shift.DAY -> Color(0xFF4F46E5) // indigo-600
-        com.example.alarm_clock_2.shift.Shift.OFF -> Color(0xFF94A3B8) // slate-400
-    }
-    val textColor = Color.White
+    val accent = shiftAccent(shift)
+    val containerColor = accent.copy(alpha = 0.18f)
 
     Box(
         modifier = Modifier
             .wrapContentWidth()
-            .background(color = bgColor, shape = androidx.compose.foundation.shape.RoundedCornerShape(4.dp))
-            .padding(horizontal = 4.dp, vertical = 1.dp),
+            .clip(RoundedCornerShape(12.dp))
+            .background(containerColor)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = shiftLabel(shift),
-            color = textColor,
+            color = accent,
             style = MaterialTheme.typography.labelMedium
         )
     }

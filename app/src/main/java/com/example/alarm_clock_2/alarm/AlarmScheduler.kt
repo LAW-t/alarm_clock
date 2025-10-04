@@ -6,8 +6,8 @@ import android.content.Context
 import android.content.Intent
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.example.alarm_clock_2.data.SettingsDataStore
+import com.example.alarm_clock_2.data.HolidayRepository
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import com.example.alarm_clock_2.shift.*
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -27,7 +27,8 @@ import com.example.alarm_clock_2.util.Constants
 @Singleton
 class AlarmScheduler @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val settings: SettingsDataStore
+    private val settings: SettingsDataStore,
+    private val holidayRepository: HolidayRepository
 ) {
 
     companion object {
@@ -137,6 +138,7 @@ class AlarmScheduler @Inject constructor(
             val base43 = settings.fourThreeBaseDateFlow.first()
             val idx42 = settings.fourTwoIndexFlow.first()
             val base42 = settings.fourTwoBaseDateFlow.first()
+            val holidayRestEnabled = settings.holidayRestFlow.first()
 
             val identity = runCatching { IdentityType.valueOf(identityStr) }.getOrDefault(IdentityType.LONG_DAY)
             val (baseIndex, baseDateStr) = when (identity) {
@@ -150,7 +152,17 @@ class AlarmScheduler @Inject constructor(
             // search next days for matching shift
             for (offset in 0..Constants.ALARM_SEARCH_DAYS) {
                 val date = LocalDate.now().plusDays(offset.toLong())
-                if (ShiftCalculator.calculate(date, config) == desiredShift) {
+                var computedShift = ShiftCalculator.calculate(date, config)
+                val iso = date.toString()
+                val holidayRestActive = holidayRestEnabled && identity == IdentityType.LONG_DAY
+                if (holidayRestActive && holidayRepository.isOffDay(iso)) {
+                    computedShift = Shift.OFF
+                } else if (holidayRestActive && holidayRepository.isWorkdayOverride(iso)) {
+                    // Adjusted working day counts as DAY for long-day identity when holidayRest is enabled
+                    computedShift = Shift.DAY
+                }
+
+                if (computedShift == desiredShift) {
                     var triggerDate = date
                     if (desiredShift == Shift.NIGHT) {
                         triggerDate = date.minusDays(1)

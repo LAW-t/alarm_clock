@@ -18,6 +18,15 @@ class HolidayRepository @Inject constructor(private val dao: HolidayDao) {
     suspend fun isOffDay(isoDate: String): Boolean = dao.getByDate(isoDate)?.isOffDay ?: false
 
     /**
+     * Returns true if the date is an adjusted working day (has holiday record and isOffDay == false).
+     * Normal weekdays without a holiday record return false.
+     */
+    suspend fun isWorkdayOverride(isoDate: String): Boolean {
+        val hd = dao.getByDate(isoDate)
+        return hd != null && !hd.isOffDay
+    }
+
+    /**
      * Return [HolidayDayEntity] for the given ISO date string (yyyy-MM-dd) or null if not found.
      */
     suspend fun getHoliday(isoDate: String): HolidayDayEntity? = dao.getByDate(isoDate)

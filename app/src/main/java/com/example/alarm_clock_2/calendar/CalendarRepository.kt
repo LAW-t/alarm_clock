@@ -117,12 +117,18 @@ class CalendarRepository @Inject constructor(
             val hd = holidayMap[date.toString()]
             val holiday = hd?.let { Holiday(it.name, it.isOffDay) }
             val isOff = hd?.isOffDay ?: false
+            val holidayRestActive = us.holidayRest && us.identity == IdentityType.LONG_DAY
+            val workdayOverrideApplied = holidayRestActive && hd != null && !isOff
 
-            if (us.holidayRest && isOff) {
+            // Holiday overrides (only for long-day identity)
+            if (holidayRestActive && isOff) {
                 shift = Shift.OFF
+            } else if (workdayOverrideApplied) {
+                // Adjusted working day (make-up work on weekend) treated as DAY for long-day
+                shift = Shift.DAY
             }
 
-            DayInfo(date, shift, lunarStr, holiday, isOff)
+            DayInfo(date, shift, lunarStr, holiday, isOff, workdayOverrideApplied)
         }
 
         val result = MonthInfo(month, days)
@@ -167,10 +173,16 @@ class CalendarRepository @Inject constructor(
             val hd = holidayMap[date.toString()]
             val holiday = hd?.let { Holiday(it.name, it.isOffDay) }
             val isOff = hd?.isOffDay ?: false
+            val holidayRestActive = us.holidayRest && us.identity == IdentityType.LONG_DAY
+            val workdayOverrideApplied = holidayRestActive && hd != null && !isOff
 
-            if (us.holidayRest && isOff) shift = Shift.OFF
+            if (holidayRestActive && isOff) {
+                shift = Shift.OFF
+            } else if (workdayOverrideApplied) {
+                shift = Shift.DAY
+            }
 
-            DayInfo(date, shift, lunarStr, holiday, isOff)
+            DayInfo(date, shift, lunarStr, holiday, isOff, workdayOverrideApplied)
         }
 
         return MonthInfo(month, days)

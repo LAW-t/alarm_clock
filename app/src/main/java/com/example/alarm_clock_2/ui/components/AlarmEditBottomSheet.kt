@@ -1,18 +1,16 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.example.alarm_clock_2.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import com.commandiron.wheel_picker_compose.WheelTimePicker
-import com.commandiron.wheel_picker_compose.core.WheelPickerDefaults
 import com.example.alarm_clock_2.data.model.ShiftOption
 import com.example.alarm_clock_2.util.Constants
 import java.time.LocalTime
@@ -76,13 +74,17 @@ private fun AlarmEditContent(
     onConfirm: (time: String, shift: String, displayName: String?) -> Unit,
     isEditMode: Boolean
 ) {
-    var selectedTime by remember { mutableStateOf(LocalTime.parse(initialTime)) }
+    val initialLocalTime = remember(initialTime) { LocalTime.parse(initialTime) }
+    val timePickerState = rememberTimePickerState(
+        initialHour = initialLocalTime.hour,
+        initialMinute = initialLocalTime.minute,
+        is24Hour = true
+    )
     var selectedShift by remember { mutableStateOf(initialShift) }
     var customDisplayName by remember { mutableStateOf(initialDisplayName ?: "") }
     var isCustomShift by remember { mutableStateOf(initialDisplayName != null) }
     
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp
+    
     
     Column(
         modifier = Modifier
@@ -128,7 +130,7 @@ private fun AlarmEditContent(
             // 确定按钮
             Button(
                 onClick = {
-                    val timeString = selectedTime.toString()
+                    val timeString = "%02d:%02d".format(timePickerState.hour, timePickerState.minute)
                     val finalDisplayName = if (isCustomShift && customDisplayName.isNotBlank()) {
                         customDisplayName
                     } else null
@@ -150,7 +152,30 @@ private fun AlarmEditContent(
             }
         }
         
-        // 班次选择
+        // 时间选择器（Material3）
+        var inputMode by remember { mutableStateOf(true) }
+        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "时间",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
+                )
+                TextButton(onClick = { inputMode = !inputMode }) {
+                    Text(text = if (inputMode) "拨盘" else "键入")
+                }
+            }
+            if (inputMode) {
+                TimeInput(state = timePickerState)
+            } else {
+                TimePicker(state = timePickerState)
+            }
+        }
+
+        // 班次选择（移至时间选择之后）
         if (shiftOptions.isNotEmpty()) {
             ShiftSelector(
                 options = shiftOptions,
@@ -205,26 +230,6 @@ private fun AlarmEditContent(
                 )
             )
         }
-        
-        // 时间选择器
-        WheelTimePicker(
-            startTime = selectedTime,
-            onSnappedTime = { time ->
-                selectedTime = time
-            },
-            size = DpSize(
-                width = (screenWidth * 0.8f).coerceAtMost(300.dp),
-                height = 180.dp
-            ),
-            selectorProperties = WheelPickerDefaults.selectorProperties(
-                shape = RoundedCornerShape(Constants.SMALL_CORNER_RADIUS),
-                color = MaterialTheme.colorScheme.primary.copy(alpha = Constants.ALPHA_SELECTOR),
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.primary.copy(alpha = Constants.ALPHA_BORDER)
-                )
-            )
-        )
     }
 }
 

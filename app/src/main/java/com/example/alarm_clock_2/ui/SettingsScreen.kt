@@ -27,8 +27,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Alarm
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.ManageAccounts
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -38,12 +41,15 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -54,8 +60,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
@@ -65,7 +73,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.alarm_clock_2.data.AlarmPlayMode
 import com.example.alarm_clock_2.shift.IdentityType
@@ -74,7 +81,9 @@ import com.example.alarm_clock_2.update.UpdateUtils
 import com.example.alarm_clock_2.update.UpdateViewModel
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val ui = viewModel.uiState.collectAsState().value
@@ -82,7 +91,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
 
     val backgroundBrush = Brush.verticalGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
             MaterialTheme.colorScheme.background
         )
     )
@@ -92,75 +101,117 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
             .fillMaxSize()
             .background(backgroundBrush)
     ) {
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            item {
-                SettingsCard(
-                    title = "身份选择",
-                    subtitle = "根据排班选择最适合的身份配置"
-                ) {
-                    IdentityRadioGroup(selected = ui.identity, onSelect = viewModel::onIdentitySelected)
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text(
+                                text = "设置中心",
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 28.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "个性化您的闹钟体验",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground
+                    )
+                )
+            },
+            containerColor = Color.Transparent
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier.padding(innerPadding),
+                state = listState,
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                item {
+                    SettingsCard(
+                        title = "身份选择",
+                        subtitle = "根据排班选择最适合的身份配置",
+                        icon = Icons.Outlined.ManageAccounts,
+                        accentColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        IdentityRadioGroup(selected = ui.identity, onSelect = viewModel::onIdentitySelected)
+                    }
                 }
-            }
 
-            when (ui.identity) {
-                IdentityType.FOUR_THREE -> {
-                    item {
-                        SettingsCard(
-                            title = "四班三运转配置",
-                            subtitle = "选择今天您所在的班次"
-                        ) {
-                            FourThreeShiftPicker(ui.fourThreeIndex, viewModel::onFourThreeIndexChanged)
+                when (ui.identity) {
+                    IdentityType.FOUR_THREE -> {
+                        item {
+                            SettingsCard(
+                                title = "四班三运转配置",
+                                subtitle = "选择今天您所在的班次",
+                                icon = Icons.Outlined.CalendarMonth,
+                                accentColor = MaterialTheme.colorScheme.tertiary
+                            ) {
+                                FourThreeShiftPicker(ui.fourThreeIndex, viewModel::onFourThreeIndexChanged)
+                            }
+                        }
+                    }
+                    IdentityType.FOUR_TWO -> {
+                        item {
+                            SettingsCard(
+                                title = "四班两运转配置",
+                                subtitle = "选择今天您所在的班次",
+                                icon = Icons.Outlined.CalendarMonth,
+                                accentColor = MaterialTheme.colorScheme.tertiary
+                            ) {
+                                FourTwoShiftPicker(ui.fourTwoIndex, viewModel::onFourTwoIndexChanged)
+                            }
+                        }
+                    }
+                    else -> Unit
+                }
+
+                item {
+                    SettingsCard(
+                        title = "闹钟设置",
+                        subtitle = "个性化响铃方式与节假日策略",
+                        icon = Icons.Outlined.NotificationsActive,
+                        accentColor = MaterialTheme.colorScheme.secondary
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            RingtonePickerRow(ui.ringtoneUri) { viewModel.onRingtoneSelected(it) }
+                            PlayModeChipGroup(selected = ui.playMode, onSelect = viewModel::onPlayModeSelected)
+                            SettingsToggleRow(
+                                title = "法定节假日休息",
+                                description = "节假日期间自动静音闹钟",
+                                checked = ui.holidayRest,
+                                onCheckedChange = viewModel::onHolidayRestChanged,
+                                enabled = ui.identity == IdentityType.LONG_DAY
+                            )
                         }
                     }
                 }
-                IdentityType.FOUR_TWO -> {
-                    item {
-                        SettingsCard(
-                            title = "四班两运转配置",
-                            subtitle = "选择今天您所在的班次"
-                        ) {
-                            FourTwoShiftPicker(ui.fourTwoIndex, viewModel::onFourTwoIndexChanged)
+
+                item {
+                    SettingsCard(
+                        title = "应用信息",
+                        subtitle = "保持更新，与开发者保持联系",
+                        icon = Icons.Outlined.Info,
+                        accentColor = MaterialTheme.colorScheme.primary
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            VersionRow()
+                            DeveloperInfoRow()
                         }
                     }
                 }
-                else -> Unit
-            }
 
-            item {
-                SettingsCard(
-                    title = "闹钟设置",
-                    subtitle = "个性化响铃方式与节假日策略"
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        RingtonePickerRow(ui.ringtoneUri) { viewModel.onRingtoneSelected(it) }
-                        PlayModeChipGroup(selected = ui.playMode, onSelect = viewModel::onPlayModeSelected)
-                        SettingsToggleRow(
-                            title = "法定节假日休息",
-                            description = "节假日期间自动静音闹钟",
-                            checked = ui.holidayRest,
-                            onCheckedChange = viewModel::onHolidayRestChanged
-                        )
-                    }
-                }
+                item { Spacer(modifier = Modifier.height(16.dp)) }
             }
-
-            item {
-                SettingsCard(
-                    title = "应用信息",
-                    subtitle = "保持更新，与开发者保持联系"
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        VersionRow()
-                        DeveloperInfoRow()
-                    }
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(16.dp)) }
         }
     }
 }
@@ -315,7 +366,7 @@ private fun RingtonePickerRow(currentUri: String, onUriSelected: (String) -> Uni
     Surface(
         modifier = Modifier.fillMaxWidth(),
         tonalElevation = 2.dp,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)),
         onClick = {
             val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
@@ -335,11 +386,19 @@ private fun RingtonePickerRow(currentUri: String, onUriSelected: (String) -> Uni
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Alarm,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Alarm,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "铃声",
@@ -433,12 +492,13 @@ private fun SettingsToggleRow(
     title: String,
     description: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         tonalElevation = 2.dp,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
     ) {
         Row(
@@ -462,6 +522,7 @@ private fun SettingsToggleRow(
             Switch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
+                enabled = enabled,
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = Color.White,
                     checkedTrackColor = MaterialTheme.colorScheme.primary,
@@ -485,7 +546,7 @@ private fun VersionRow() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         tonalElevation = 2.dp,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)),
         onClick = {
             updateViewModel.clearPostponedUpdate()
@@ -499,11 +560,19 @@ private fun VersionRow() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Update,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Update,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "检查更新",
@@ -565,7 +634,7 @@ private fun DeveloperInfoRow() {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         tonalElevation = 2.dp,
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)),
         onClick = { showDialog = true }
     ) {
@@ -576,11 +645,19 @@ private fun DeveloperInfoRow() {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
-            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Info,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
             Text(
                 text = "开发者信息",
                 style = MaterialTheme.typography.titleMedium,
@@ -639,32 +716,55 @@ private fun DeveloperInfoRow() {
 private fun SettingsCard(
     title: String,
     subtitle: String? = null,
+    icon: ImageVector? = null,
+    accentColor: Color = MaterialTheme.colorScheme.primary,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(26.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(2.dp)
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.06f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
-                )
-                subtitle?.let {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (icon != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(accentColor.copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = accentColor
+                        )
+                    }
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                    subtitle?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
             content()

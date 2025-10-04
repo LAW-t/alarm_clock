@@ -77,9 +77,10 @@ class ShiftAlarmWorker(
         var todayShift = ShiftCalculator.calculate(today, config)
         var tomorrowShift = ShiftCalculator.calculate(tomorrow, config)
 
-        // 若开启“节假日休息”且当天为法定休息日，则视为休息班次
+        // 若开启“节假日休息”(仅对长白班生效)且当天为法定休息日，则视为休息班次
         val holidayRestEnabled = settings.holidayRestFlow.first()
-        if (holidayRestEnabled) {
+        val holidayRestActive = holidayRestEnabled && identity == IdentityType.LONG_DAY
+        if (holidayRestActive) {
             if (holidayRepo.isOffDay(today.toString())) {
                 todayShift = Shift.OFF
             }
@@ -87,14 +88,23 @@ class ShiftAlarmWorker(
                 tomorrowShift = Shift.OFF
             }
         }
+        // Adjusted working days (make-up work on weekends) for LONG_DAY: treat as DAY when holidayRest is enabled
+        if (holidayRestActive) {
+            if (holidayRepo.isWorkdayOverride(today.toString())) {
+                todayShift = Shift.DAY
+            }
+            if (holidayRepo.isWorkdayOverride(tomorrow.toString())) {
+                tomorrowShift = Shift.DAY
+            }
+        }
 
+        val alarms = repo.getAlarms().first()
         val activeShifts = buildSet {
             if (todayShift != Shift.OFF) add(todayShift.name)
             if (tomorrowShift != Shift.OFF) add(tomorrowShift.name)
         }
 
         // 2. 更新闹钟表
-        val alarms = repo.getAlarms().first()
         alarms.forEach { alarm ->
             if (alarm.shift in activeShifts) {
                 ensureEnabledAndScheduled(alarm)

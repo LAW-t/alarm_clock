@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,7 +36,10 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
     }
 
     val identityFlow: Flow<String> = context.dataStore.data.map { it[Keys.IDENTITY] ?: "LONG_DAY" }
-    val holidayRestFlow: Flow<Boolean> = context.dataStore.data.map { it[Keys.HOLIDAY_REST] ?: false }
+    // 默认：长白班时“法定节假日休息”开启；其他身份默认关闭
+    val holidayRestFlow: Flow<Boolean> = context.dataStore.data.combine(identityFlow) { prefs, identity ->
+        prefs[Keys.HOLIDAY_REST] ?: (identity == "LONG_DAY")
+    }
 
     val fourThreeIndexFlow: Flow<Int> = context.dataStore.data.map { it[Keys.FOUR3_INDEX] ?: 0 }
     val fourTwoIndexFlow: Flow<Int> = context.dataStore.data.map { it[Keys.FOUR2_INDEX] ?: 0 }

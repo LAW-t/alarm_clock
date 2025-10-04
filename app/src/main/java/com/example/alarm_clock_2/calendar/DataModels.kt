@@ -19,7 +19,8 @@ data class DayInfo(
     val shift: Shift,
     val lunarDay: String,
     val holiday: Holiday?,
-    val isOffDay: Boolean
+    val isOffDay: Boolean,
+    val workdayOverrideApplied: Boolean
 )
 
 /** 整月信息 */
