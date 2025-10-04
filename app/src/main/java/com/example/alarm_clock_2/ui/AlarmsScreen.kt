@@ -31,7 +31,9 @@ import com.commandiron.wheel_picker_compose.WheelTimePicker
 
 import com.commandiron.wheel_picker_compose.core.WheelPickerDefaults
 import com.example.alarm_clock_2.shift.IdentityType
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.temporal.ChronoUnit
 import java.time.LocalTime
 import android.widget.Toast
 import kotlin.math.roundToInt
@@ -104,6 +106,25 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
     val allAlarms = currentIdentityAlarms.map { alarm ->
         val label = labelMap[alarm.shift] ?: alarm.displayName ?: alarm.shift
         AlarmDisplayItem(alarm, label)
+    }
+
+    val currentTime by produceState(initialValue = LocalTime.now()) {
+        while (true) {
+            value = LocalTime.now()
+            delay(60_000)
+        }
+    }
+
+    val upcomingAlarmId = remember(allAlarms, currentTime) {
+        allAlarms
+            .filter { it.entity.enabled }
+            .mapNotNull { item ->
+                minutesUntilNextAlarm(item.entity.time, currentTime)?.let { minutes ->
+                    item.entity.id to minutes
+                }
+            }
+            .minByOrNull { it.second }
+            ?.first
     }
 
 
@@ -203,6 +224,7 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
                     SwipeToDeleteAlarmCard(
                         alarm = item.entity,
                         label = item.label,
+                        isUpcoming = item.entity.id == upcomingAlarmId,
                         onEdit = {
                             editingAlarm = item.entity
                             showEditDialog = true
@@ -257,6 +279,7 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
 private fun SwipeToDeleteAlarmCard(
     alarm: com.example.alarm_clock_2.data.AlarmTimeEntity,
     label: String,
+    isUpcoming: Boolean,
     onEdit: () -> Unit,
     onToggle: () -> Unit,
     onDelete: () -> Unit
@@ -315,6 +338,7 @@ private fun SwipeToDeleteAlarmCard(
         ModernAlarmCard(
             alarm = alarm,
             label = label,
+            isUpcoming = isUpcoming,
             onEdit = onEdit,
             onToggle = onToggle
         )
@@ -325,6 +349,7 @@ private fun SwipeToDeleteAlarmCard(
 private fun ModernAlarmCard(
     alarm: com.example.alarm_clock_2.data.AlarmTimeEntity,
     label: String,
+    isUpcoming: Boolean,
     onEdit: () -> Unit,
     onToggle: () -> Unit
 ) {
@@ -339,8 +364,17 @@ private fun ModernAlarmCard(
             .clickable { onEdit() },
         shape = RoundedCornerShape(20.dp), // 更大的圆角
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = if (isUpcoming) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
         ),
+        border = if (isUpcoming) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+        } else {
+            null
+        },
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp,
             pressedElevation = 4.dp
@@ -356,6 +390,20 @@ private fun ModernAlarmCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
+                AnimatedVisibility(visible = isUpcoming) {
+                    Text(
+                        text = "下一个闹钟",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                if (isUpcoming) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
                 // 时间显示 - 更大更醒目
                 Text(
                     text = timeDisplay,
@@ -751,4 +799,12 @@ private fun AlarmEditBottomSheet(
         }
     }
 
+}
+
+private fun minutesUntilNextAlarm(time: String, now: LocalTime): Long? {
+    return runCatching {
+        val targetTime = LocalTime.parse(time)
+        val diff = ChronoUnit.MINUTES.between(now, targetTime)
+        if (diff >= 0) diff else diff + 24 * 60
+    }.getOrNull()
 }
