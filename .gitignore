@@ -43,3 +43,4 @@ coverage/
 # OS / Editor metadata
 Thumbs.db
 .vscode/
+/AGENTS.md
