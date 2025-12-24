@@ -76,7 +76,7 @@ private fun AlarmScreen(shift: String?, onDismiss: () -> Unit) {
                     })
                     onDismiss()
                 }) {
-                    Text("暂停")
+                    Text("稍后提醒")
                 }
                 Button(onClick = {
                     context.startForegroundService(Intent(context, AlarmService::class.java).apply {
@@ -84,7 +84,7 @@ private fun AlarmScreen(shift: String?, onDismiss: () -> Unit) {
                     })
                     onDismiss()
                 }) {
-                    Text("停止")
+                    Text("关闭闹钟")
                 }
             }
         }

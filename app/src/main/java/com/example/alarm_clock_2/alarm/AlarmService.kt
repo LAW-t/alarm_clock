@@ -269,8 +269,8 @@ class AlarmService : Service() {
             .setContentTitle("闹钟响铃")
             .setContentText("闹钟正在响铃…")
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .addAction(android.R.drawable.ic_media_pause, "暂停", pausePending)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "停止", stopPending)
+            .addAction(android.R.drawable.ic_media_pause, "稍后提醒", pausePending)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "关闭闹钟", stopPending)
             // Make the whole notification clickable as well, opening the full-screen alarm UI
             .setContentIntent(fullScreenPending)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
