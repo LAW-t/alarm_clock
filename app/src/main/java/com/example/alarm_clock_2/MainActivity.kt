@@ -76,6 +76,13 @@ private const val MAIN_GRAPH_ROUTE = "main_graph"
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) {
+        val configuration = newBase.resources.configuration
+        configuration.fontScale = 1f
+        val context = newBase.createConfigurationContext(configuration)
+        super.attachBaseContext(context)
+    }
+
     @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -247,17 +254,35 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppTheme(
     minFontScale: Float = 1f,
-    maxFontScale: Float = 1.2f,
+    maxFontScale: Float = 1f,
     content: @Composable () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val current = LocalDensity.current
-    // 将系统 fontScale 限制在给定区间内
-    val cappedDensity = remember(current, minFontScale, maxFontScale) {
-        val scale = current.fontScale.coerceIn(minFontScale, maxFontScale)
-        Density(current.density, fontScale = scale)
+    
+    // 强制修正 Density，确保在“显示大小”被调大时，应用仍有足够的 dp 宽度（至少 360dp）
+    // 这样可以防止布局因屏幕 dp 宽度过小而错乱
+    val lockedDensity = remember(current) {
+        val displayMetrics = context.resources.displayMetrics
+        val widthPx = displayMetrics.widthPixels
+        val heightPx = displayMetrics.heightPixels
+        // 计算当前 density 下的 dp 宽度
+        val currentWidthDp = widthPx / current.density
+        
+        // 设定最小目标宽度 dp (例如 360dp，这是大多数手机的标准宽度)
+        val minTargetWidthDp = 360f
+        
+        if (currentWidthDp < minTargetWidthDp) {
+            // 如果当前 dp 宽度小于 360，说明 density 太大了，强制缩小 density
+            val newDensity = widthPx / minTargetWidthDp
+            Density(density = newDensity, fontScale = 1f)
+        } else {
+            // 宽度足够，仅锁定 fontScale
+            Density(density = current.density, fontScale = 1f)
+        }
     }
 
-    CompositionLocalProvider(LocalDensity provides cappedDensity) {
+    CompositionLocalProvider(LocalDensity provides lockedDensity) {
         MaterialTheme(content = content)
     }
 }

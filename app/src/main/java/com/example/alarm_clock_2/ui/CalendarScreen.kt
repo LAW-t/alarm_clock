@@ -335,8 +335,7 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
                 verticalArrangement = Arrangement.Center
             ) {
         // Date number with unified circle wrapper
-        val fontScale = LocalConfiguration.current.fontScale
-        val circleSize = (56.dp * fontScale).coerceIn(14.dp, 26.dp)
+        val circleSize = 28.dp
 
         Surface(
             modifier = Modifier.size(circleSize),
@@ -377,7 +376,7 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         val subText = when {
             holiday == null -> day.lunarDay
@@ -391,7 +390,7 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
             color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(3.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         // Shift label chip
         ShiftChip(shift = day.shift)
@@ -415,10 +414,10 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
             modifier = Modifier
                 .fillMaxSize()
         ) {
-            val fontScale = LocalConfiguration.current.fontScale
-            val baseMin = 48.dp
-            val minHeight = baseMin * fontScale.coerceIn(1f, 1.4f)
-            val maxHeightCap = 80.dp * fontScale.coerceIn(1f, 1.4f)
+            val fontScale = 1f // 已在 Activity 中锁定
+            val baseMin = 50.dp
+            val minHeight = baseMin
+            val maxHeightCap = 120.dp
 
             // 修正：先为行间距预留空间，再计算单元格高度
             // 1. 决定行间距大小 (自适应，并限制在 2dp-8dp)
@@ -431,7 +430,8 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
             val rawHeight = if (heightForCells > 0.dp) heightForCells / 6 else 0.dp
 
             // 3. 应用最大/最小高度约束
-            val cellHeight = rawHeight.coerceIn(minHeight, maxHeightCap)
+            // 允许格子高度根据内容自适应，不设硬性上限，或者设置一个较大的上限
+            val cellHeight = rawHeight.coerceIn(minHeight, 120.dp)
 
             // 视图所需总高度按实际 cellHeight 重新计算
             val needHeight = cellHeight * 6
