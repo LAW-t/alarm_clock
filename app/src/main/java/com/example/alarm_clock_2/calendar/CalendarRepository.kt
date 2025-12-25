@@ -112,7 +112,8 @@ class CalendarRepository @Inject constructor(
             var shift = ShiftCalculator.calculate(date, config)
 
             val lunar = com.nlf.calendar.Solar.fromYmd(date.year, date.monthValue, date.dayOfMonth).lunar
-            val lunarStr = lunar.dayInChinese
+            val jieQi = lunar.jieQi
+            val lunarStr = if (jieQi.isNotEmpty()) jieQi else lunar.dayInChinese
 
             val hd = holidayMap[date.toString()]
             val holiday = hd?.let { Holiday(it.name, it.isOffDay) }
@@ -168,7 +169,8 @@ class CalendarRepository @Inject constructor(
             var shift = ShiftCalculator.calculate(date, config)
 
             val lunar = com.nlf.calendar.Solar.fromYmd(date.year, date.monthValue, date.dayOfMonth).lunar
-            val lunarStr = lunar.dayInChinese
+            val jieQi = lunar.jieQi
+            val lunarStr = if (jieQi.isNotEmpty()) jieQi else lunar.dayInChinese
 
             val hd = holidayMap[date.toString()]
             val holiday = hd?.let { Holiday(it.name, it.isOffDay) }

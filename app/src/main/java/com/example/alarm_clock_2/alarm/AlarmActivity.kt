@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.dp
 import android.content.Intent
 import android.view.WindowManager
 import androidx.compose.ui.platform.LocalContext
+import com.example.alarm_clock_2.ui.theme.AppTheme
+import com.example.alarm_clock_2.alarm.AlarmService
 
 class AlarmActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: android.content.Context) {
@@ -37,7 +39,7 @@ class AlarmActivity : ComponentActivity() {
         // AlarmService 已由 AlarmReceiver 启动，这里无需再次启动，避免重复播放
 
         setContent {
-            com.example.alarm_clock_2.AppTheme {
+            AppTheme {
                 val shift = intent?.getStringExtra("shift")
                 AlarmScreen(shift, onDismiss = {
                     stopService(Intent(this, AlarmService::class.java))

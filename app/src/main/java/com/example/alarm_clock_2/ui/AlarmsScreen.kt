@@ -38,6 +38,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
  
 import com.example.alarm_clock_2.ui.components.AlarmEditBottomSheet
 import com.example.alarm_clock_2.shift.IdentityType
+import com.example.alarm_clock_2.ui.modifiers.bounceClick
+import com.example.alarm_clock_2.ui.modifiers.pressClickEffect
 import com.example.alarm_clock_2.data.AlarmTimeEntity
 import kotlinx.coroutines.delay
 import java.time.LocalTime
@@ -181,7 +183,9 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
                     onClick = { showAddDialog = true },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(60.dp),
+                    modifier = Modifier
+                        .size(60.dp)
+                        .pressClickEffect(),
                     shape = CircleShape,
                     elevation = FloatingActionButtonDefaults.elevation(
                         defaultElevation = 8.dp,
@@ -325,6 +329,7 @@ private fun AlarmItemWithLongPress(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .pressClickEffect()
             .combinedClickable(
                 onClick = onEdit,
                 onLongClick = { showDeleteDialog = true }

@@ -19,6 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import com.example.alarm_clock_2.ui.SettingsScreen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -64,6 +67,7 @@ import com.example.alarm_clock_2.update.*
 import com.example.alarm_clock_2.worker.UpdateCheckWorker
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.collectAsState
+import com.example.alarm_clock_2.ui.theme.AppTheme
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Calendar : Screen("calendar", "日历", Icons.Default.DateRange)
@@ -179,7 +183,13 @@ class MainActivity : ComponentActivity() {
                                     startDestination = Screen.Calendar.route,
                                     route = MAIN_GRAPH_ROUTE
                                 ) {
-                                    composable(Screen.Calendar.route) { backStackEntry ->
+                                    composable(
+                                        route = Screen.Calendar.route,
+                                        enterTransition = { fadeIn(animationSpec = tween(300)) },
+                                        exitTransition = { fadeOut(animationSpec = tween(300)) },
+                                        popEnterTransition = { fadeIn(animationSpec = tween(300)) },
+                                        popExitTransition = { fadeOut(animationSpec = tween(300)) }
+                                    ) { backStackEntry ->
                                         // 使用图级别的 ViewModelStoreOwner，确保 CalendarViewModel 长驻
                                         val parentEntry = remember(backStackEntry) {
                                             navController.getBackStackEntry(MAIN_GRAPH_ROUTE)
@@ -189,8 +199,20 @@ class MainActivity : ComponentActivity() {
                                         CalendarScreen(viewModel)
                                     }
 
-                                    composable(Screen.Alarms.route) { AlarmsScreen() }
-                                    composable(Screen.Settings.route) { SettingsScreen() }
+                                    composable(
+                                        route = Screen.Alarms.route,
+                                        enterTransition = { fadeIn(animationSpec = tween(300)) },
+                                        exitTransition = { fadeOut(animationSpec = tween(300)) },
+                                        popEnterTransition = { fadeIn(animationSpec = tween(300)) },
+                                        popExitTransition = { fadeOut(animationSpec = tween(300)) }
+                                    ) { AlarmsScreen() }
+                                    composable(
+                                        route = Screen.Settings.route,
+                                        enterTransition = { fadeIn(animationSpec = tween(300)) },
+                                        exitTransition = { fadeOut(animationSpec = tween(300)) },
+                                        popEnterTransition = { fadeIn(animationSpec = tween(300)) },
+                                        popExitTransition = { fadeOut(animationSpec = tween(300)) }
+                                    ) { SettingsScreen() }
                                 }
                             }
                         }
@@ -250,47 +272,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-@Composable
-fun AppTheme(
-    minFontScale: Float = 1f,
-    maxFontScale: Float = 1f,
-    content: @Composable () -> Unit
-) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val current = LocalDensity.current
-    
-    // 强制修正 Density，确保在“显示大小”被调大时，应用仍有足够的 dp 宽度（至少 360dp）
-    // 这样可以防止布局因屏幕 dp 宽度过小而错乱
-    val lockedDensity = remember(current) {
-        val displayMetrics = context.resources.displayMetrics
-        val widthPx = displayMetrics.widthPixels
-        val heightPx = displayMetrics.heightPixels
-        // 计算当前 density 下的 dp 宽度
-        val currentWidthDp = widthPx / current.density
-        
-        // 设定最小目标宽度 dp (例如 360dp，这是大多数手机的标准宽度)
-        val minTargetWidthDp = 360f
-        
-        if (currentWidthDp < minTargetWidthDp) {
-            // 如果当前 dp 宽度小于 360，说明 density 太大了，强制缩小 density
-            val newDensity = widthPx / minTargetWidthDp
-            Density(density = newDensity, fontScale = 1f)
-        } else {
-            // 宽度足够，仅锁定 fontScale
-            Density(density = current.density, fontScale = 1f)
-        }
-    }
-
-    CompositionLocalProvider(LocalDensity provides lockedDensity) {
-        MaterialTheme(content = content)
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    AppTheme {
-        Text("Hello")
-    }
-} 
+ 

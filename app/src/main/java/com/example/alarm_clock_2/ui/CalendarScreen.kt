@@ -54,6 +54,7 @@ import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlinx.coroutines.launch
+import com.example.alarm_clock_2.ui.modifiers.pressClickEffect
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -115,6 +116,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                         onClick = {
                             scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) }
                         },
+                        modifier = Modifier.pressClickEffect(),
                         enabled = canGoPrevious
                     ) {
                         Icon(
@@ -126,6 +128,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Surface(
                             onClick = { showYmPicker = true },
+                            modifier = Modifier.pressClickEffect(),
                             shape = RoundedCornerShape(22.dp),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
                             tonalElevation = 1.dp,
@@ -172,6 +175,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                         onClick = {
                             scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(totalPages - 1)) }
                         },
+                        modifier = Modifier.pressClickEffect(),
                         enabled = canGoNext
                     ) {
                         Icon(
@@ -317,7 +321,7 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
             .padding(all = 4.dp)
     ) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().pressClickEffect(),
             onClick = {
                 day.holiday?.name?.let { name ->
                     android.widget.Toast.makeText(context, name, android.widget.Toast.LENGTH_SHORT).show()
