@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="12dp"
+    android:background="@drawable/widget_background">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="下次闹钟"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="12sp"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/widget_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="--:--"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:layout_marginTop="4dp"
+        android:maxLines="1" />
+
+    <TextView
+        android:id="@+id/widget_subtitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="点击打开应用"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="11sp"
+        android:layout_marginTop="2dp"
+        android:maxLines="1" />
+
+</LinearLayout>

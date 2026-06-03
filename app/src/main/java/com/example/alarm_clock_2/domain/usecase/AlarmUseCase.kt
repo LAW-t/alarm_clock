@@ -224,6 +224,7 @@ class AlarmUseCase @Inject constructor(
             IdentityType.LONG_DAY -> listOf("DAY")
             IdentityType.FOUR_THREE -> listOf("MORNING", "AFTERNOON", "NIGHT")
             IdentityType.FOUR_TWO -> listOf("MORNING", "NIGHT")
+            IdentityType.CUSTOM -> listOf("DAY", "MORNING", "AFTERNOON", "NIGHT")
         }
     }
 }

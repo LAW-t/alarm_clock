@@ -92,6 +92,28 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     val ui = viewModel.uiState.collectAsState().value
     val listState = rememberLazyListState()
 
+    // 身份切换确认对话框
+    var pendingIdentity by remember { mutableStateOf<IdentityType?>(null) }
+
+    if (pendingIdentity != null) {
+        AlertDialog(
+            onDismissRequest = { pendingIdentity = null },
+            title = { Text("切换身份", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("切换到${pendingIdentity!!.displayName()}后，当前身份的闹钟将暂时隐藏（数据保留不会删除）。\n\n确定要切换吗？")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingIdentity?.let { viewModel.onIdentitySelected(it) }
+                    pendingIdentity = null
+                }) { Text("确定切换", color = MaterialTheme.colorScheme.primary) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingIdentity = null }) { Text("取消") }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -128,13 +150,30 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                 ) {
                     IdentitySelectionCards(
                         selected = ui.identity,
-                        onSelect = viewModel::onIdentitySelected
+                        onSelect = { pendingIdentity = it }
                     )
                 }
             }
 
+            // 自定义班次配置
+            if (ui.identity == IdentityType.CUSTOM) {
+                item {
+                    SettingsSection(
+                        title = "自定义排班",
+                        icon = Icons.Outlined.FormatListBulleted
+                    ) {
+                        CustomShiftConfig(
+                            pattern = ui.customPattern,
+                            currentIndex = ui.customIndex,
+                            onPatternChange = viewModel::onCustomPatternChanged,
+                            onIndexChange = viewModel::onCustomIndexChanged
+                        )
+                    }
+                }
+            }
+
             // 班次配置部分（根据身份显示）
-            if (ui.identity != IdentityType.LONG_DAY) {
+            if (ui.identity != IdentityType.LONG_DAY && ui.identity != IdentityType.CUSTOM) {
                 item {
                     SettingsSection(
                         title = "班次设置",
@@ -144,7 +183,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                             when (ui.identity) {
                                 IdentityType.FOUR_THREE -> {
                                     ShiftPickerContent(
-                                        title = "四班三运转当前班次",
+                                        title = "三班倒当前班次",
                                         selectedIndex = ui.fourThreeIndex,
                                         onSelect = viewModel::onFourThreeIndexChanged,
                                         labels = listOf("休(一)", "休(二)", "晚(一)", "晚(二)", "早(一)", "早(二)", "中(一)", "中(二)")
@@ -152,7 +191,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
                                 }
                                 IdentityType.FOUR_TWO -> {
                                     ShiftPickerContent(
-                                        title = "四班两运转当前班次",
+                                        title = "两班倒当前班次",
                                         selectedIndex = ui.fourTwoIndex,
                                         onSelect = viewModel::onFourTwoIndexChanged,
                                         labels = listOf("早", "晚", "休(一)", "休(二)")
@@ -229,6 +268,117 @@ fun SettingsScreen(viewModel: SettingsViewModel = hiltViewModel()) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun CustomShiftConfig(
+    pattern: String,
+    currentIndex: Int,
+    onPatternChange: (String) -> Unit,
+    onIndexChange: (Int) -> Unit
+) {
+    val shifts = remember(pattern) {
+        com.example.alarm_clock_2.shift.ShiftCalculator.parseCustomPattern(pattern)
+    }
+    val cycleDays = shifts.size
+    // 可选的班次类型
+    val allShifts = com.example.alarm_clock_2.shift.Shift.values()
+
+    ModernSettingsCard {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // 周期配置：每个位置可点选切换班次
+            Text("排班周期（点击切换班次）", style = MaterialTheme.typography.labelMedium)
+            Spacer(Modifier.height(10.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                shifts.forEachIndexed { idx, shift ->
+                    FilterChip(
+                        selected = idx == currentIndex,
+                        onClick = {
+                            // 轮回切换班次
+                            val currentShiftIdx = allShifts.indexOf(shift)
+                            val nextShift = allShifts[(currentShiftIdx + 1) % allShifts.size]
+                            val newPattern = shifts.toMutableList().also { it[idx] = nextShift }
+                                .joinToString(",") { it.name }
+                            onPatternChange(newPattern)
+                        },
+                        label = { Text(customShiftLabel(shift)) },
+                        shape = RoundedCornerShape(12.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            // 添加/删除周期天数
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TextButton(onClick = {
+                    // 增加一天（默认 OFF）
+                    onPatternChange("$pattern,OFF")
+                }) {
+                    Text("+ 增加一天", style = MaterialTheme.typography.labelMedium)
+                }
+                TextButton(
+                    onClick = {
+                        if (cycleDays > 2) {
+                            val newPattern = shifts.dropLast(1).joinToString(",") { it.name }
+                            onPatternChange(newPattern)
+                            if (currentIndex >= cycleDays - 1) onIndexChange(0)
+                        }
+                    },
+                    enabled = cycleDays > 2
+                ) {
+                    Text("- 减少一天", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            if (cycleDays > 0) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                )
+                Text("当前是周期第几天", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(6.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    (0 until cycleDays).forEach { idx ->
+                        FilterChip(
+                            selected = idx == currentIndex,
+                            onClick = { onIndexChange(idx) },
+                            label = { Text("第${idx + 1}天 · ${customShiftLabel(shifts[idx])}") },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun customShiftLabel(shift: com.example.alarm_clock_2.shift.Shift): String = when (shift) {
+    com.example.alarm_clock_2.shift.Shift.DAY -> "班"
+    com.example.alarm_clock_2.shift.Shift.MORNING -> "早"
+    com.example.alarm_clock_2.shift.Shift.AFTERNOON -> "中"
+    com.example.alarm_clock_2.shift.Shift.NIGHT -> "晚"
+    com.example.alarm_clock_2.shift.Shift.OFF -> "休"
+}
+
 @Composable
 private fun SettingsSection(
     title: String,
@@ -288,14 +438,14 @@ private fun IdentitySelectionCards(
         IdentityCard(
             modifier = Modifier.weight(1f),
             title = "长白班",
-            description = "周一至周五",
+            description = "按星期排",
             icon = Icons.Outlined.Work,
             isSelected = selected == IdentityType.LONG_DAY,
             onClick = { onSelect(IdentityType.LONG_DAY) }
         )
         IdentityCard(
             modifier = Modifier.weight(1f),
-            title = "四班三",
+            title = "三班倒",
             description = "8天周期",
             icon = Icons.Outlined.Schedule,
             isSelected = selected == IdentityType.FOUR_THREE,
@@ -303,11 +453,19 @@ private fun IdentitySelectionCards(
         )
         IdentityCard(
             modifier = Modifier.weight(1f),
-            title = "四班两",
+            title = "两班倒",
             description = "4天周期",
             icon = Icons.Outlined.History,
             isSelected = selected == IdentityType.FOUR_TWO,
             onClick = { onSelect(IdentityType.FOUR_TWO) }
+        )
+        IdentityCard(
+            modifier = Modifier.weight(1f),
+            title = "自定义",
+            description = "自由排班",
+            icon = Icons.Outlined.FormatListBulleted,
+            isSelected = selected == IdentityType.CUSTOM,
+            onClick = { onSelect(IdentityType.CUSTOM) }
         )
     }
 }
@@ -860,8 +1018,9 @@ private fun resolveRingtoneName(context: android.content.Context, uriString: Str
 
 private fun IdentityType.displayName(): String = when (this) {
     IdentityType.LONG_DAY -> "长白班"
-    IdentityType.FOUR_THREE -> "四班三运转"
-    IdentityType.FOUR_TWO -> "四班两运转"
+    IdentityType.FOUR_THREE -> "三班倒"
+    IdentityType.FOUR_TWO -> "两班倒"
+    IdentityType.CUSTOM -> "自定义排班"
 }
 
 private fun AlarmPlayMode.displayName(): String = when (this) {

@@ -14,7 +14,10 @@ enum class IdentityType {
     FOUR_THREE,
 
     /** 四班两运转（早-晚-休-休，4 天周期） */
-    FOUR_TWO
+    FOUR_TWO,
+
+    /** 自定义排班（用户自行定义周期和班次类型） */
+    CUSTOM
 }
 
 /**
@@ -46,7 +49,9 @@ enum class Shift {
 data class ShiftConfig(
     val identity: IdentityType,
     val baseDate: LocalDate = LocalDate.now(),
-    val baseShiftIndex: Int = 0
+    val baseShiftIndex: Int = 0,
+    /** 自定义班次模式，逗号分隔的 Shift 枚举名，如 "MORNING,NIGHT,OFF,OFF" */
+    val customPattern: String = ""
 )
 
 object ShiftCalculator {
@@ -86,7 +91,29 @@ object ShiftCalculator {
             val idx = positiveMod(config.baseShiftIndex + days, patternFourTwo.size)
             patternFourTwo[idx]
         }
+
+        IdentityType.CUSTOM -> {
+            val pattern = parseCustomPattern(config.customPattern)
+            if (pattern.isEmpty()) Shift.OFF
+            else {
+                val days = ChronoUnit.DAYS.between(config.baseDate, date).toInt()
+                val idx = positiveMod(config.baseShiftIndex + days, pattern.size)
+                pattern[idx]
+            }
+        }
     }
+
+    /** 解析自定义班次字符串为 Shift 列表 */
+    fun parseCustomPattern(raw: String): List<Shift> {
+        if (raw.isBlank()) return emptyList()
+        return raw.split(",")
+            .mapNotNull { name ->
+                runCatching { Shift.valueOf(name.trim()) }.getOrNull()
+            }
+    }
+
+    /** 计算周期天数 */
+    fun customCycleDays(raw: String): Int = parseCustomPattern(raw).size
 
     private fun positiveMod(value: Int, mod: Int): Int {
         val r = value % mod

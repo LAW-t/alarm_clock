@@ -13,53 +13,57 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.ChevronLeft
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Today
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import android.view.WindowManager
+import android.util.DisplayMetrics
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import java.time.DayOfWeek
 import java.time.format.TextStyle
-import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlinx.coroutines.launch
 import com.example.alarm_clock_2.ui.modifiers.pressClickEffect
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
-    // 首次安装时节假日数据在后台加载，去掉阻塞式 Dialog
+    // 固定密度：使用物理屏幕密度（不受系统"显示大小"设置影响），
+    // 确保日历内所有 dp/sp 值在修改显示大小时保持不变
+    val context = LocalContext.current
+    val fixedDensity = remember {
+        val wm = context.getSystemService(android.content.Context.WINDOW_SERVICE) as WindowManager
+        val metrics = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        wm.defaultDisplay.getRealMetrics(metrics)
+        Density(metrics.density, fontScale = 1f)
+    }
+    CompositionLocalProvider(LocalDensity provides fixedDensity) {
 
     val baseMonth = remember { java.time.YearMonth.now() }
     val totalPages = 240 // ±10 years window
@@ -70,8 +74,17 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
     // 当前 pager 页面对应的 YearMonth
     val currentMonth = baseMonth.plusMonths((pagerState.currentPage - initialPage).toLong())
 
-    // YearMonth Picker 弹窗
-    var showYmPicker by remember { mutableStateOf(false) }
+    // 根据 WindowSizeClass 自适应 padding，避免大显示尺寸下布局溢出
+    val windowSizeClass = LocalWindowSizeClass.current
+    val isCompactWidth = windowSizeClass.widthSizeClass == WindowWidthSizeClass.Compact
+
+    val outerHorizontalPad = if (isCompactWidth) 6.dp else 12.dp
+    val outerVerticalPad = if (isCompactWidth) 4.dp else 8.dp
+    val surfaceTopPad = if (isCompactWidth) 12.dp else 20.dp
+    val surfaceSidePad = if (isCompactWidth) 12.dp else 20.dp
+    val surfaceBottomPad = if (isCompactWidth) 8.dp else 12.dp
+    val headerToWeekdaySpacer = if (isCompactWidth) 8.dp else 16.dp
+    val weekdayToGridSpacer = if (isCompactWidth) 6.dp else 12.dp
 
     val primary = MaterialTheme.colorScheme.primary
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
@@ -90,7 +103,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundBrush)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = outerHorizontalPad, vertical = outerVerticalPad)
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -101,7 +114,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = 24.dp, start = 20.dp, end = 20.dp, bottom = 16.dp)
+                    .padding(top = surfaceTopPad, start = surfaceSidePad, end = surfaceSidePad, bottom = surfaceBottomPad)
             ) {
                 // ----- Header -----
                 val canGoPrevious = pagerState.currentPage > 0
@@ -125,50 +138,31 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                         )
                     }
 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(
-                            onClick = { showYmPicker = true },
-                            modifier = Modifier.pressClickEffect(),
-                            shape = RoundedCornerShape(22.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                            tonalElevation = 1.dp,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    // 年月按钮：点击回到本月
+                    Surface(
+                        onClick = {
+                            scope.launch { pagerState.animateScrollToPage(initialPage) }
+                        },
+                        modifier = Modifier.pressClickEffect(),
+                        shape = RoundedCornerShape(22.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                        tonalElevation = 1.dp,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Rounded.CalendarMonth,
-                                    contentDescription = null
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "${currentMonth.year}年${currentMonth.monthValue}月",
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                            }
-                        }
-
-                        Spacer(Modifier.height(10.dp))
-
-                        AssistChip(
-                            onClick = {
-                                scope.launch { pagerState.animateScrollToPage(initialPage) }
-                            },
-                            label = { Text("回到本月") },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Rounded.Today,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-                                labelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            Icon(
+                                imageVector = Icons.Rounded.Today,
+                                contentDescription = "回到本月"
                             )
-                        )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "${currentMonth.year}年${currentMonth.monthValue}月",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
                     }
 
                     IconButton(
@@ -185,7 +179,7 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(headerToWeekdaySpacer))
 
                 // ----- Day of week labels -----
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
@@ -219,12 +213,12 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
                     }
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(weekdayToGridSpacer))
 
                 // ----- Pager with Calendar grids -----
                 HorizontalPager(state = pagerState, modifier = Modifier.weight(1f)) { page ->
                     val month = baseMonth.plusMonths((page - initialPage).toLong())
-                    MonthGrid(month = month, viewModel = viewModel)
+                    MonthGrid(month = month, viewModel = viewModel, isCompact = isCompactWidth)
                 }
 
                 // ----- Legend -----
@@ -233,14 +227,8 @@ fun CalendarScreen(viewModel: CalendarViewModel = hiltViewModel()) {
         }
     }
 
-    if (showYmPicker) {
-        YearMonthPickerDialog(currentMonth = currentMonth, onConfirm = { ym ->
-            val diff = ChronoUnit.MONTHS.between(baseMonth, ym).toInt()
-            val targetPage = (initialPage + diff).coerceIn(0, totalPages - 1)
-            scope.launch { pagerState.animateScrollToPage(targetPage) }
-            showYmPicker = false
-        }, onDismiss = { showYmPicker = false })
-    }
+    } // CompositionLocalProvider(fixedDensity)
+
 }
 
 @Composable
@@ -252,24 +240,27 @@ private fun ShiftLegendRow() {
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
     ) {
-        Row(
+        // 使用 FlowRow 替代 Row，窄屏时自动换行避免溢出
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            maxItemsInEachRow = 5
         ) {
             com.example.alarm_clock_2.shift.Shift.values().forEach { shift ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(14.dp)
+                            .size(12.dp)
                             .background(color = shiftAccent(shift), shape = CircleShape)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = shiftLabel(shift),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -295,6 +286,10 @@ private fun shiftLabel(shift: com.example.alarm_clock_2.shift.Shift): String = w
     com.example.alarm_clock_2.shift.Shift.OFF -> "休"
 }
 
+/**
+ * 根据可用 cellHeight 自适应内容密度。
+ * 当显示大小调到最大时 cellHeight 可能只有 50dp，需要缩小/隐藏部分内容以避免溢出。
+ */
 @Composable
 private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight: androidx.compose.ui.unit.Dp) {
     if (day == null) {
@@ -313,12 +308,50 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
 
     val holiday = day.holiday
 
+    // 根据 cellHeight 分三档自适应：< 58dp 紧凑 / < 70dp 中等 / >= 70dp 完整
+    val density = when {
+        cellHeight < 58.dp -> CellDensity.COMPACT
+        cellHeight < 70.dp -> CellDensity.MEDIUM
+        else -> CellDensity.FULL
+    }
+
+    val circleSize = when (density) {
+        CellDensity.COMPACT -> 22.dp
+        CellDensity.MEDIUM -> 26.dp
+        CellDensity.FULL -> 28.dp
+    }
+    val dateStyle = when {
+        density == CellDensity.COMPACT -> MaterialTheme.typography.bodySmall
+        isToday -> MaterialTheme.typography.titleMedium
+        else -> MaterialTheme.typography.titleSmall
+    }
+    val subTextStyle = when (density) {
+        CellDensity.COMPACT -> MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
+        CellDensity.MEDIUM -> MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp)
+        CellDensity.FULL -> MaterialTheme.typography.labelSmall
+    }
+    val verticalPad = when (density) {
+        CellDensity.COMPACT -> 1.dp
+        CellDensity.MEDIUM -> 1.dp
+        CellDensity.FULL -> 2.dp
+    }
+    val spacerH = when (density) {
+        CellDensity.COMPACT -> 1.dp
+        CellDensity.MEDIUM -> 1.dp
+        CellDensity.FULL -> 1.dp
+    }
+    val showShiftChip = density != CellDensity.COMPACT
+    val holidayDotSize = when (density) {
+        CellDensity.COMPACT -> 6.dp
+        else -> 8.dp
+    }
+
     // 使用 Surface 承载点击与圆角，这样涟漪与点击区域与视觉圆角完全一致
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = cellHeight)
-            .padding(all = 4.dp)
+            .padding(all = 1.dp)
     ) {
         Surface(
             modifier = Modifier.fillMaxSize().pressClickEffect(),
@@ -334,23 +367,21 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                    .padding(horizontal = 4.dp, vertical = verticalPad),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
         // Date number with unified circle wrapper
-        val circleSize = 28.dp
-
         Surface(
             modifier = Modifier.size(circleSize),
             shape = CircleShape,
             color = if (isToday) MaterialTheme.colorScheme.primary else Color.Transparent,
-            tonalElevation = if (isToday) 3.dp else 0.dp
+            tonalElevation = if (isToday && density != CellDensity.COMPACT) 3.dp else 0.dp
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = day.date.dayOfMonth.toString(),
-                    style = if (isToday) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                    style = dateStyle,
                     color = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                 )
 
@@ -361,17 +392,15 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
                         MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
                     }
                     val dotColor = if (day.isOffDay) {
-                        // Off-day (休) -> red dot
                         MaterialTheme.colorScheme.error
                     } else {
-                        // Adjusted workday (上班) -> primary dot
                         MaterialTheme.colorScheme.primary
                     }
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .offset(x = (-2).dp, y = 2.dp) // move inward to avoid clipping
-                            .size(8.dp)
+                            .offset(x = (-2).dp, y = 2.dp)
+                            .size(holidayDotSize)
                             .zIndex(1f)
                             .background(dotColor, CircleShape)
                             .border(0.75.dp, indicatorBorder, CircleShape)
@@ -380,7 +409,7 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
             }
         }
 
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(spacerH))
 
         val subText = when {
             holiday == null -> day.lunarDay
@@ -390,22 +419,30 @@ private fun DayCell(day: com.example.alarm_clock_2.calendar.DayInfo?, cellHeight
         }
         Text(
             text = subText,
-            style = MaterialTheme.typography.labelSmall,
+            style = subTextStyle,
+            maxLines = 1,
             color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(2.dp))
-
-        // Shift label chip
-        ShiftChip(shift = day.shift)
+        if (showShiftChip) {
+            Spacer(modifier = Modifier.height(spacerH))
+            ShiftChip(shift = day.shift, density = density)
+        }
             }
         }
     }
 }
 
+/** 单元格内容密度等级，用于适配不同显示大小 */
+private enum class CellDensity { COMPACT, MEDIUM, FULL }
+
 // ------- 月份网格 -------
 @Composable
-private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel = hiltViewModel()) {
+private fun MonthGrid(
+    month: java.time.YearMonth,
+    viewModel: CalendarViewModel = hiltViewModel(),
+    isCompact: Boolean = false
+) {
     val monthInfo by viewModel.monthInfoFlow(month).collectAsState(initial = com.example.alarm_clock_2.calendar.MonthInfo(month, viewModel.peekMonthDays(month)))
     val days = monthInfo.days
 
@@ -418,32 +455,26 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
             modifier = Modifier
                 .fillMaxSize()
         ) {
-            val fontScale = 1f // 已在 Activity 中锁定
-            val baseMin = 50.dp
-            val minHeight = baseMin
+            // 紧凑模式下降低最小单元格高度与 padding，释放更多空间给内容
+            val minHeight = if (isCompact) 38.dp else 44.dp
             val maxHeightCap = 120.dp
 
-            // 修正：先为行间距预留空间，再计算单元格高度
-            // 1. 决定行间距大小 (自适应，并限制在 2dp-8dp)
-            val desiredGap = (maxHeight * 0.02f).coerceIn(2.dp, 8.dp)
-            val totalGapHeight = desiredGap * 5 // 6行之间有5个间距
-            val verticalContainerPadding = 24.dp
+            // 1. 决定行间距大小 (自适应，并限制在 1dp-4dp)
+            val desiredGap = (maxHeight * 0.015f).coerceIn(1.dp, 4.dp)
+            val lazyColumnPadding = if (isCompact) 6.dp else 10.dp
 
-            // 2. 用剩余空间计算单元格高度
-            val heightForCells = (maxHeight - verticalContainerPadding - totalGapHeight).coerceAtLeast(0.dp)
+            // 2. 用剩余空间计算单元格高度（扣除 LazyColumn 内边距与行间距）
+            val totalGapHeight = desiredGap * 5 // 6行之间有5个间距
+            val heightForCells = (maxHeight - totalGapHeight - lazyColumnPadding * 2).coerceAtLeast(0.dp)
             val rawHeight = if (heightForCells > 0.dp) heightForCells / 6 else 0.dp
 
             // 3. 应用最大/最小高度约束
-            // 允许格子高度根据内容自适应，不设硬性上限，或者设置一个较大的上限
-            val cellHeight = rawHeight.coerceIn(minHeight, 120.dp)
+            val cellHeight = rawHeight.coerceIn(minHeight, maxHeightCap)
 
-            // 视图所需总高度按实际 cellHeight 重新计算
-            val needHeight = cellHeight * 6
+            // 始终允许滚动作为安全网：当格子内容因 heightIn(min) 超出计算高度时不会裁剪末行
 
-            // prepare weeks
-            // Insert leading blanks so the first day aligns with its weekday column
+            // prepare weeks — 补前导空白使1号对齐到正确的星期列
             val firstDayOfWeekIdx = days.firstOrNull()?.date?.dayOfWeek?.value?.minus(1) ?: 0 // 0=Mon, 6=Sun
-
             val totalSlots = 7 * 6
             val padded: List<com.example.alarm_clock_2.calendar.DayInfo?> =
                 List(firstDayOfWeekIdx) { null } +
@@ -451,13 +482,10 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
                         List(totalSlots - firstDayOfWeekIdx - days.size) { null }
             val weeks = padded.chunked(7)
 
-            // ----------- 适配大尺寸 -----------
-            // 屏幕过宽时，限制网格最大宽度并居中；保持等宽 7 列
+            // 屏幕过宽时限制网格最大宽度并居中
             val maxGridWidth = 600.dp
             val gridWidth = if (maxWidth > maxGridWidth) maxGridWidth else maxWidth
             val horizontalPad = (maxWidth - gridWidth) / 2
-
-            val scrollEnabled = (needHeight + totalGapHeight + verticalContainerPadding) > maxHeight
 
             Surface(
                 modifier = Modifier
@@ -470,9 +498,9 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                        .padding(horizontal = lazyColumnPadding, vertical = lazyColumnPadding),
                     verticalArrangement = Arrangement.spacedBy(desiredGap),
-                    userScrollEnabled = scrollEnabled
+                    userScrollEnabled = true // 始终可滚动，避免末行裁剪
                 ) {
                     items(weeks) { week ->
                         Row(modifier = Modifier.fillMaxWidth()) {
@@ -490,83 +518,39 @@ private fun MonthGrid(month: java.time.YearMonth, viewModel: CalendarViewModel =
 }
 
 @Composable
-private fun ShiftChip(shift: com.example.alarm_clock_2.shift.Shift) {
+private fun ShiftChip(shift: com.example.alarm_clock_2.shift.Shift, density: CellDensity = CellDensity.FULL) {
     val accent = shiftAccent(shift)
     val containerColor = accent.copy(alpha = 0.18f)
+
+    val hPad = when (density) {
+        CellDensity.COMPACT -> 3.dp
+        CellDensity.MEDIUM -> 4.dp
+        CellDensity.FULL -> 6.dp
+    }
+    val vPad = when (density) {
+        CellDensity.COMPACT -> 1.dp
+        else -> 2.dp
+    }
+    val textStyle = when (density) {
+        CellDensity.COMPACT -> MaterialTheme.typography.labelSmall
+        CellDensity.MEDIUM -> MaterialTheme.typography.labelMedium
+        CellDensity.FULL -> MaterialTheme.typography.labelMedium
+    }
 
     Box(
         modifier = Modifier
             .wrapContentWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(containerColor)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+            .padding(horizontal = hPad, vertical = vPad),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = shiftLabel(shift),
             color = accent,
-            style = MaterialTheme.typography.labelMedium
+            style = textStyle
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun YearMonthPickerDialog(currentMonth: java.time.YearMonth, onConfirm: (java.time.YearMonth)->Unit, onDismiss:()->Unit) {
-    var yearExpanded by remember { mutableStateOf(false) }
-    var monthExpanded by remember { mutableStateOf(false) }
-
-    var year by remember { mutableStateOf(currentMonth.year) }
-    var month by remember { mutableStateOf(currentMonth.monthValue) }
-
-    val years = (currentMonth.year-10)..(currentMonth.year+10)
-    val months = (1..12)
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(onClick = { onConfirm(java.time.YearMonth.of(year, month)) }) { Text("确定") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
-        },
-        title = { Text("选择年月") },
-        text = {
-            Column {
-                ExposedDropdownMenuBox(expanded = yearExpanded, onExpandedChange = { yearExpanded = !yearExpanded }) {
-                    OutlinedTextField(
-                        value = "${year}年",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("年份") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = yearExpanded) },
-                        modifier = Modifier.menuAnchor()
-                    )
-                    ExposedDropdownMenu(expanded = yearExpanded, onDismissRequest = { yearExpanded = false }) {
-                        years.forEach { y ->
-                            DropdownMenuItem(text = { Text("$y 年") }, onClick = { year = y; yearExpanded = false })
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                ExposedDropdownMenuBox(expanded = monthExpanded, onExpandedChange = { monthExpanded = !monthExpanded }) {
-                    OutlinedTextField(
-                        value = "${month}月",
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("月份") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = monthExpanded) },
-                        modifier = Modifier.menuAnchor()
-                    )
-                    ExposedDropdownMenu(expanded = monthExpanded, onDismissRequest = { monthExpanded = false }) {
-                        months.forEach { m ->
-                            DropdownMenuItem(text = { Text("$m 月") }, onClick = { month = m; monthExpanded = false })
-                        }
-                    }
-                }
-            }
-        }
-    )
-} 
+ 

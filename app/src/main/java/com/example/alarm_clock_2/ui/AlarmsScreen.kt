@@ -83,6 +83,12 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
                 "MORNING" to "早班",
                 "NIGHT" to "晚班"
             )
+            IdentityType.CUSTOM -> listOf(
+                "DAY" to "白班",
+                "MORNING" to "早班",
+                "AFTERNOON" to "中班",
+                "NIGHT" to "晚班"
+            )
         }
     }
 
@@ -143,6 +149,21 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
             in 11..13 -> "午间小憩也别忘了定闹钟"
             in 14..18 -> "午后时光，保持专注"
             else -> "夜深了，别忘了好好休息"
+        }
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    // 监听撤销删除事件
+    LaunchedEffect(Unit) {
+        viewModel.undoDeleteFlow.collect { (msg, alarm) ->
+            val result = snackbarHostState.showSnackbar(
+                message = msg,
+                actionLabel = "撤销",
+                duration = androidx.compose.material3.SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoDeleteAlarm(alarm)
+            }
         }
     }
 
@@ -275,6 +296,24 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
                 }
             }
         }
+
+        // 顶部撤销 Snackbar
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 12.dp, start = 16.dp, end = 16.dp),
+            snackbar = { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = MaterialTheme.colorScheme.inverseSurface,
+                    contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                    actionColor = MaterialTheme.colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.padding(0.dp)
+                )
+            }
+        )
     }
 
     // 添加闹钟对话框

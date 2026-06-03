@@ -20,6 +20,8 @@
     <!-- 网络访问权限，用于从 GitHub 拉取节假日数据 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Android 14+ 全屏通知拉起 Activity 所需权限 -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <application
         android:name=".MyApplication"
@@ -43,6 +45,18 @@
             android:turnScreenOn="true" />
         <!-- Alarm broadcast receiver -->
         <receiver android:name=".alarm.AlarmReceiver" android:exported="false" />
+
+        <!-- 桌面小组件：显示下次闹钟 -->
+        <receiver
+            android:name=".widget.NextAlarmWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/next_alarm_widget_info" />
+        </receiver>
 
         <!-- Re-schedule alarms after device reboot -->
         <receiver

@@ -26,6 +26,8 @@ class SettingsViewModel @Inject constructor(
         val holidayRest: Boolean = false,
         val fourThreeIndex: Int = 0,
         val fourTwoIndex: Int = 0,
+        val customPattern: String = "MORNING,NIGHT,OFF,OFF",
+        val customIndex: Int = 0,
         val playMode: AlarmPlayMode = AlarmPlayMode.SOUND,
         val ringtoneUri: String = "",
         val snoozeCount: Int = 3,
@@ -42,27 +44,38 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // 两级 combine 突破 5-Flow 参数上限
+    @Suppress("UNCHECKED_CAST")
     private val _uiState: StateFlow<UiState> = combine(
-        dataStore.identityFlow,
-        dataStore.holidayRestFlow,
-        dataStore.fourThreeIndexFlow,
-        dataStore.fourTwoIndexFlow,
-        dataStore.playModeFlow,
-        dataStore.ringtoneUriFlow,
-        dataStore.snoozeCountFlow,
-        dataStore.snoozeIntervalFlow,
+        combine(
+            dataStore.identityFlow,
+            dataStore.holidayRestFlow,
+            dataStore.fourThreeIndexFlow,
+            dataStore.fourTwoIndexFlow,
+            dataStore.customPatternFlow
+        ) { id, hr, i43, i42, cp -> listOf(id, hr, i43, i42, cp) },
+        combine(
+            dataStore.customIndexFlow,
+            dataStore.playModeFlow,
+            dataStore.ringtoneUriFlow,
+            dataStore.snoozeCountFlow,
+            dataStore.snoozeIntervalFlow
+        ) { ci, pm, ru, sc, si -> listOf(ci, pm, ru, sc, si) },
         _latestVersion
-    ) { values ->
-        val identity = toIdentity(values[0] as String)
-        val holiday = values[1] as Boolean
-        val idx43 = values[2] as Int
-        val idx42 = values[3] as Int
-        val mode = AlarmPlayMode.from(values[4] as String)
-        val uri = values[5] as String
-        val count = values[6] as Int
-        val interval = values[7] as Int
-        val latestVersion = values[8] as String?
-        UiState(identity, holiday, idx43, idx42, mode, uri, count, interval, latestVersion)
+    ) { g1, g2, lv ->
+        UiState(
+            identity = toIdentity(g1[0] as String),
+            holidayRest = g1[1] as Boolean,
+            fourThreeIndex = g1[2] as Int,
+            fourTwoIndex = g1[3] as Int,
+            customPattern = g1[4] as String,
+            customIndex = g2[0] as Int,
+            playMode = AlarmPlayMode.from(g2[1] as String),
+            ringtoneUri = g2[2] as String,
+            snoozeCount = g2[3] as Int,
+            snoozeInterval = g2[4] as Int,
+            latestVersion = lv
+        )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, UiState())
 
     val uiState: StateFlow<UiState> = _uiState
@@ -87,6 +100,13 @@ class SettingsViewModel @Inject constructor(
     fun onSnoozeCountChanged(count: Int) = launch { dataStore.setSnoozeCount(count) }
 
     fun onSnoozeIntervalChanged(minutes: Int) = launch { dataStore.setSnoozeInterval(minutes) }
+
+    fun onCustomPatternChanged(pattern: String) = launch { dataStore.setCustomPattern(pattern) }
+
+    fun onCustomIndexChanged(index: Int) = launch {
+        dataStore.setCustomIndex(index)
+        dataStore.setCustomBaseDate(LocalDate.now().toString())
+    }
 
     private fun launch(block: suspend () -> Unit) = viewModelScope.launch { block() }
 

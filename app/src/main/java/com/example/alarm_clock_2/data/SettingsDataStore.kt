@@ -33,6 +33,10 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
         // 重复响铃次数与间隔
         val SNOOZE_COUNT = intPreferencesKey("snooze_count")
         val SNOOZE_INTERVAL = intPreferencesKey("snooze_interval")
+        // 自定义班次
+        val CUSTOM_PATTERN = stringPreferencesKey("custom_pattern")
+        val CUSTOM_INDEX = intPreferencesKey("custom_index")
+        val CUSTOM_BASE_DATE = stringPreferencesKey("custom_base_date")
     }
 
     val identityFlow: Flow<String> = context.dataStore.data.map { it[Keys.IDENTITY] ?: "LONG_DAY" }
@@ -63,6 +67,13 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
     // 新增：重复响铃设置，默认次数 3 次，间隔 5 分钟
     val snoozeCountFlow: Flow<Int> = context.dataStore.data.map { it[Keys.SNOOZE_COUNT] ?: 3 }
     val snoozeIntervalFlow: Flow<Int> = context.dataStore.data.map { it[Keys.SNOOZE_INTERVAL] ?: 5 }
+
+    // 自定义班次：默认 "MORNING,NIGHT,OFF,OFF"（4天，早-晚-休-休）
+    val customPatternFlow: Flow<String> = context.dataStore.data.map { it[Keys.CUSTOM_PATTERN] ?: "MORNING,NIGHT,OFF,OFF" }
+    val customIndexFlow: Flow<Int> = context.dataStore.data.map { it[Keys.CUSTOM_INDEX] ?: 0 }
+    val customBaseDateFlow: Flow<String> = context.dataStore.data.map {
+        it[Keys.CUSTOM_BASE_DATE] ?: java.time.LocalDate.now().toString()
+    }
 
     // === setter ===
     suspend fun setIdentity(value: String) {
@@ -105,5 +116,15 @@ class SettingsDataStore @Inject constructor(@ApplicationContext private val cont
 
     suspend fun setSnoozeInterval(minutes: Int) {
         context.dataStore.edit { it[Keys.SNOOZE_INTERVAL] = minutes }
+    }
+
+    suspend fun setCustomPattern(pattern: String) {
+        context.dataStore.edit { it[Keys.CUSTOM_PATTERN] = pattern }
+    }
+    suspend fun setCustomIndex(index: Int) {
+        context.dataStore.edit { it[Keys.CUSTOM_INDEX] = index }
+    }
+    suspend fun setCustomBaseDate(date: String) {
+        context.dataStore.edit { it[Keys.CUSTOM_BASE_DATE] = date }
     }
 } 

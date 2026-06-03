@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">倒班闹钟</string>
+    <string name="widget_description">显示下次闹钟时间和班次信息</string>
 </resources>

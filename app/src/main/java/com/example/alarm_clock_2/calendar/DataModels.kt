@@ -36,5 +36,8 @@ data class UserSettings(
     val baseDate43: LocalDate,
     val baseIndex43: Int,
     val baseDate42: LocalDate,
-    val baseIndex42: Int
+    val baseIndex42: Int,
+    val customPattern: String = "",
+    val baseDateCustom: LocalDate = LocalDate.now(),
+    val baseIndexCustom: Int = 0
 ) 

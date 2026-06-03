@@ -94,6 +94,12 @@ data class ShiftOption(
                     ShiftOption("MORNING", "早班"),
                     ShiftOption("NIGHT", "晚班")
                 )
+                com.example.alarm_clock_2.shift.IdentityType.CUSTOM -> listOf(
+                    ShiftOption("DAY", "白班"),
+                    ShiftOption("MORNING", "早班"),
+                    ShiftOption("AFTERNOON", "中班"),
+                    ShiftOption("NIGHT", "晚班")
+                )
             }
         }
     }

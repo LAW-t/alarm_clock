@@ -31,26 +31,38 @@ class CalendarRepository @Inject constructor(
 
     private val scope = CoroutineScope(SupervisorJob())
 
+    @Suppress("UNCHECKED_CAST")
     private val userSettingsFlow: Flow<UserSettings> = combine(
-        settings.identityFlow,
-        settings.holidayRestFlow,
-        settings.fourThreeBaseDateFlow,
-        settings.fourThreeIndexFlow,
-        settings.fourTwoBaseDateFlow,
-        settings.fourTwoIndexFlow
-    ) { arr ->
-        val identityStr = arr[0] as String
-        val holidayRest = arr[1] as Boolean
-        val base43DateStr = arr[2] as String
-        val idx43 = arr[3] as Int
-        val base42DateStr = arr[4] as String
-        val idx42 = arr[5] as Int
+        combine(
+            settings.identityFlow,
+            settings.holidayRestFlow,
+            settings.fourThreeBaseDateFlow,
+            settings.fourThreeIndexFlow,
+            settings.fourTwoBaseDateFlow
+        ) { id, hr, b43, i43, b42 -> listOf(id, hr, b43, i43, b42) },
+        combine(
+            settings.fourTwoIndexFlow,
+            settings.customPatternFlow,
+            settings.customIndexFlow,
+            settings.customBaseDateFlow
+        ) { i42, cp, ci, cb -> listOf(i42, cp, ci, cb) }
+    ) { g1, g2 ->
+        val identityStr = g1[0] as String
+        val holidayRest = g1[1] as Boolean
+        val base43DateStr = g1[2] as String
+        val idx43 = g1[3] as Int
+        val base42DateStr = g1[4] as String
+        val idx42 = g2[0] as Int
+        val customPat = g2[1] as String
+        val customIdx = g2[2] as Int
+        val customBaseStr = g2[3] as String
 
         val identity = runCatching { IdentityType.valueOf(identityStr) }.getOrDefault(IdentityType.LONG_DAY)
         val base43Date = runCatching { LocalDate.parse(base43DateStr) }.getOrElse { LocalDate.now() }
         val base42Date = runCatching { LocalDate.parse(base42DateStr) }.getOrElse { LocalDate.now() }
+        val customBaseDate = runCatching { LocalDate.parse(customBaseStr) }.getOrElse { LocalDate.now() }
 
-        UserSettings(identity, holidayRest, base43Date, idx43, base42Date, idx42)
+        UserSettings(identity, holidayRest, base43Date, idx43, base42Date, idx42, customPat, customBaseDate, customIdx)
     }.distinctUntilChanged()
 
     init {
@@ -88,24 +100,7 @@ class CalendarRepository @Inject constructor(
         val total = month.lengthOfMonth()
         val first = month.atDay(1)
 
-        val baseDate: LocalDate
-        val baseIdx: Int
-        when (us.identity) {
-            IdentityType.FOUR_THREE -> {
-                baseDate = us.baseDate43
-                baseIdx = us.baseIndex43
-            }
-            IdentityType.FOUR_TWO -> {
-                baseDate = us.baseDate42
-                baseIdx = us.baseIndex42
-            }
-            else -> {
-                baseDate = LocalDate.now()
-                baseIdx = 0
-            }
-        }
-
-        val config = ShiftConfig(us.identity, baseDate, baseIdx)
+        val config = buildShiftConfig(us)
 
         val days = (0 until total).map { offset ->
             val date = first.plusDays(offset.toLong())
@@ -156,13 +151,7 @@ class CalendarRepository @Inject constructor(
         val total = month.lengthOfMonth()
         val first = month.atDay(1)
 
-        val (baseDate, baseIdx) = when (us.identity) {
-            IdentityType.FOUR_THREE -> us.baseDate43 to us.baseIndex43
-            IdentityType.FOUR_TWO -> us.baseDate42 to us.baseIndex42
-            else -> LocalDate.now() to 0
-        }
-
-        val config = ShiftConfig(us.identity, baseDate, baseIdx)
+        val config = buildShiftConfig(us)
 
         val days = (0 until total).map { offset ->
             val date = first.plusDays(offset.toLong())
@@ -188,5 +177,14 @@ class CalendarRepository @Inject constructor(
         }
 
         return MonthInfo(month, days)
+    }
+
+    private fun buildShiftConfig(us: UserSettings): ShiftConfig {
+        return when (us.identity) {
+            IdentityType.FOUR_THREE -> ShiftConfig(us.identity, us.baseDate43, us.baseIndex43)
+            IdentityType.FOUR_TWO -> ShiftConfig(us.identity, us.baseDate42, us.baseIndex42)
+            IdentityType.CUSTOM -> ShiftConfig(us.identity, us.baseDateCustom, us.baseIndexCustom, us.customPattern)
+            else -> ShiftConfig(us.identity, LocalDate.now(), 0)
+        }
     }
 } 

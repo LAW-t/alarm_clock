@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -34,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.example.alarm_clock_2.data.AlarmTimeEntity
 import java.time.LocalTime
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 
 /**
  * 美化后的闹钟编辑底部弹窗
@@ -141,6 +143,20 @@ fun AlarmEditBottomSheet(
                         color = if (selectedShift.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Unspecified
                     )
                 }
+            }
+
+            // 防止 TimeInput 自动获取焦点：延迟清除 + 收起键盘
+            val focusManager = LocalFocusManager.current
+            val view = androidx.compose.ui.platform.LocalView.current
+            LaunchedEffect(Unit) {
+                focusManager.clearFocus()
+                // 二次清除：TimeInput 内部可能在下一帧请求焦点
+                kotlinx.coroutines.delay(100)
+                focusManager.clearFocus()
+                // 同时通过 View API 收起输入法
+                val imm = view.context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+                    as android.view.inputmethod.InputMethodManager
+                imm.hideSoftInputFromWindow(view.windowToken, 0)
             }
 
             // 时间选择器部分

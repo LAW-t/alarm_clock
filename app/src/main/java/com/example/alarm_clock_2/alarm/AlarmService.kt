@@ -256,7 +256,10 @@ class AlarmService : Service() {
 
         // Full-screen intent so that it can wake the screen / launch UI when the phone is locked
         val fullScreenIntent = Intent(this, AlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("alarm_id", alarmId)
+            putExtra("shift", shift)
+            putExtra("snooze_remaining", snoozeRemaining)
         }
         val fullScreenPending = PendingIntent.getActivity(
             this,
@@ -299,8 +302,10 @@ class AlarmService : Service() {
         val remaining = intent.getIntExtra("snooze_remaining", 0)
         if (remaining <= 0) return
 
-        // Load interval from settings
-        val intervalMin = runBlocking { settings.snoozeIntervalFlow.first() }
+        // 优先使用传入的自定义贪睡时长，否则使用全局设置
+        val customDelay = intent.getIntExtra("snooze_delay_minutes", -1)
+        val intervalMin = if (customDelay > 0) customDelay
+            else runBlocking { settings.snoozeIntervalFlow.first() }
         val delayMillis = intervalMin * 60_000L
 
         val alarmManager = getSystemService(ALARM_SERVICE) as android.app.AlarmManager

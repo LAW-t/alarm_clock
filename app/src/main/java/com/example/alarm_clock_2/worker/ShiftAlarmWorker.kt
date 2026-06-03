@@ -61,15 +61,19 @@ class ShiftAlarmWorker(
         val base43 = settings.fourThreeBaseDateFlow.first()
         val idx42 = settings.fourTwoIndexFlow.first()
         val base42 = settings.fourTwoBaseDateFlow.first()
+        val customIdx = settings.customIndexFlow.first()
+        val customBase = settings.customBaseDateFlow.first()
+        val customPat = settings.customPatternFlow.first()
 
         val identity = runCatching { IdentityType.valueOf(identityStr) }.getOrDefault(IdentityType.LONG_DAY)
         val (baseIndex, baseDateStr) = when (identity) {
             IdentityType.FOUR_THREE -> idx43 to base43
             IdentityType.FOUR_TWO -> idx42 to base42
+            IdentityType.CUSTOM -> customIdx to customBase
             else -> 0 to LocalDate.now().toString()
         }
         val baseDate = runCatching { LocalDate.parse(baseDateStr) }.getOrElse { LocalDate.now() }
-        val config = ShiftConfig(identity, baseDate, baseIndex)
+        val config = ShiftConfig(identity, baseDate, baseIndex, customPat)
 
         val today = LocalDate.now()
         val tomorrow = today.plusDays(1)

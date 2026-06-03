@@ -62,12 +62,16 @@ class AlarmReceiver : BroadcastReceiver() {
         }
 
         val activityIntent = Intent(context, AlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             putExtra("shift", shift)
             putExtra("alarm_id", alarmId)
             putExtra("snooze_remaining", remaining)
         }
-        context.startActivity(activityIntent)
+        try {
+            context.startActivity(activityIntent)
+        } catch (e: Exception) {
+            Log.w("AlarmReceiver", "startActivity failed (background restriction), falling back to fullScreenIntent", e)
+        }
 
         // After the current alarm is triggered, immediately schedule the next upcoming
         // occurrence of all enabled alarms. This guarantees that alarms keep working

@@ -15,6 +15,7 @@ import com.example.alarm_clock_2.util.Result
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -41,6 +42,11 @@ class AlarmsViewModel @Inject constructor(
     val nextTriggerMap: StateFlow<Map<Int, Long?>> = _nextTriggerMap.asStateFlow()
 
     private var nextTriggerJob: Job? = null
+    private var pendingDeleteJob: Job? = null
+
+    // 撤销删除：记录待删除的闹钟及Snackbar消息
+    private val _undoDeleteFlow = MutableSharedFlow<Pair<String, AlarmTimeEntity>>()
+    val undoDeleteFlow: SharedFlow<Pair<String, AlarmTimeEntity>> = _undoDeleteFlow
 
     // ==================== 数据流 ====================
 
@@ -73,12 +79,19 @@ class AlarmsViewModel @Inject constructor(
 
         viewModelScope.launch {
             combine(
-                settingsDataStore.holidayRestFlow,
-                settingsDataStore.fourThreeIndexFlow,
-                settingsDataStore.fourThreeBaseDateFlow,
-                settingsDataStore.fourTwoIndexFlow,
-                settingsDataStore.fourTwoBaseDateFlow
-            ) { _, _, _, _, _ -> }
+                combine(
+                    settingsDataStore.holidayRestFlow,
+                    settingsDataStore.fourThreeIndexFlow,
+                    settingsDataStore.fourThreeBaseDateFlow,
+                    settingsDataStore.fourTwoIndexFlow,
+                    settingsDataStore.fourTwoBaseDateFlow
+                ) { _, _, _, _, _ -> },
+                combine(
+                    settingsDataStore.customPatternFlow,
+                    settingsDataStore.customIndexFlow,
+                    settingsDataStore.customBaseDateFlow
+                ) { _, _, _ -> }
+            ) { _, _ -> }
                 .collect {
                     refreshNextTriggers(alarmDisplayItems.value.map { it.entity })
                 }
@@ -197,7 +210,7 @@ class AlarmsViewModel @Inject constructor(
     }
 
     /**
-     * 删除闹钟
+     * 删除闹钟（支持5秒内撤销）
      */
     fun deleteAlarm(alarm: AlarmTimeEntity) = viewModelScope.launch {
         setLoading(true)
@@ -205,15 +218,29 @@ class AlarmsViewModel @Inject constructor(
         // 先取消调度
         cancelAlarm(alarm)
 
-        // 再删除数据
-        alarmUseCase.deleteAlarm(alarm)
-            .onSuccess {
-                showToast("闹钟已删除")
-            }
-            .onError { message, exception ->
-                handleError("删除闹钟失败: $message", exception)
-            }
+        // 延迟实际删除，给用户撤销时间
+        _undoDeleteFlow.emit("闹钟已删除" to alarm)
+        pendingDeleteJob?.cancel()
+        pendingDeleteJob = viewModelScope.launch {
+            delay(5_000)
+            alarmUseCase.deleteAlarm(alarm)
+                .onError { message, exception ->
+                    handleError("删除闹钟失败: $message", exception)
+                }
+            setLoading(false)
+        }
+    }
 
+    /**
+     * 撤销删除
+     */
+    fun undoDeleteAlarm(alarm: AlarmTimeEntity) = viewModelScope.launch {
+        pendingDeleteJob?.cancel()
+        // 重新调度（如果闹钟是启用状态）
+        if (alarm.enabled) {
+            scheduleAlarm(alarm)
+        }
+        showToast("已撤销删除")
         setLoading(false)
     }
 
