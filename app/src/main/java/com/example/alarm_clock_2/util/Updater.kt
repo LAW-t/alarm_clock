@@ -14,7 +14,11 @@ import org.json.JSONObject
 import java.net.URL
 
 object Updater {
-    private const val LATEST_API = "https://api.github.com/repos/LAW-t/alarm_clock/releases/latest"
+    // 主源：Gitee；备用：GitHub
+    private val API_URLS = listOf(
+        "https://gitee.com/api/v5/repos/LAWhome/alarm_clock/releases/latest",
+        "https://api.github.com/repos/LAW-t/alarm_clock/releases/latest"
+    )
 
     /** in-memory cache; clears after [CACHE_WINDOW_MS] */
     private var cachedInfo: ReleaseInfo? = null
@@ -29,14 +33,25 @@ object Updater {
             return@withContext cachedInfo
         }
 
-        return@withContext try {
-            val conn = URL(LATEST_API).openConnection() as java.net.HttpURLConnection
-            conn.setRequestProperty("Accept", "application/vnd.github+json")
+        for (url in API_URLS) {
+            val info = tryFetch(url)
+            if (info != null) {
+                cachedInfo = info
+                lastFetch = now
+                return@withContext info
+            }
+        }
+        null
+    }
+
+    private fun tryFetch(apiUrl: String): ReleaseInfo? {
+        return try {
+            val conn = URL(apiUrl).openConnection() as java.net.HttpURLConnection
+            conn.setRequestProperty("Accept", "application/json")
             conn.setRequestProperty("User-Agent", "alarm-clock-app")
-            conn.setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             conn.connectTimeout = 5000
             conn.readTimeout = 5000
-            if (conn.responseCode != 200) return@withContext null
+            if (conn.responseCode != 200) return null
             val json = conn.inputStream.bufferedReader().use { it.readText() }
             val obj = JSONObject(json)
             val version = obj.getString("tag_name")
@@ -50,12 +65,7 @@ object Updater {
                     break
                 }
             }
-            val info = if (apkUrl.isBlank()) null else ReleaseInfo(version, apkUrl)
-            if (info != null) {
-                cachedInfo = info
-                lastFetch = now
-            }
-            info
+            if (apkUrl.isBlank()) null else ReleaseInfo(version, apkUrl)
         } catch (e: Exception) {
             null
         }

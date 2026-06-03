@@ -49,23 +49,35 @@ class UpdateRepository @Inject constructor(
     private val WIFI_ONLY_DOWNLOAD = booleanPreferencesKey("wifi_only_download")
 
     companion object {
-        private const val GITHUB_API_URL = "https://api.github.com/repos/LAW-t/alarm_clock/releases/latest"
+        // 主源：Gitee；备用：GitHub
+        private val API_URLS = listOf(
+            "https://gitee.com/api/v5/repos/LAWhome/alarm_clock/releases/latest",
+            "https://api.github.com/repos/LAW-t/alarm_clock/releases/latest"
+        )
         private const val APK_FILE_NAME = "alarm_clock_update.apk"
         private const val POSTPONE_DURATION_HOURS = 24L // Postpone for 24 hours
     }
 
     /**
-     * Check for app updates from GitHub releases
+     * 检查更新：Gitee 优先，GitHub 备用
      */
     suspend fun checkForUpdates(currentVersion: String): Result<UpdateInfo?> {
+        for (url in API_URLS) {
+            val result = tryFetchRelease(url, currentVersion)
+            if (result.isSuccess && result.getOrNull() != null) return result
+        }
+        return Result.success(null)
+    }
+
+    private suspend fun tryFetchRelease(apiUrl: String, currentVersion: String): Result<UpdateInfo?> {
         return try {
             val request = Request.Builder()
-                .url(GITHUB_API_URL)
-                .addHeader("Accept", "application/vnd.github.v3+json")
+                .url(apiUrl)
+                .addHeader("Accept", "application/json")
                 .build()
 
             val response = httpClient.newCall(request).execute()
-            
+
             if (!response.isSuccessful) {
                 return Result.failure(Exception("API request failed: ${response.code}"))
             }
@@ -74,7 +86,7 @@ class UpdateRepository @Inject constructor(
                 ?: return Result.failure(Exception("Empty response body"))
 
             val release = json.decodeFromString<GitHubRelease>(responseBody)
-            
+
             // Skip pre-release versions
             if (release.prerelease) {
                 return Result.success(null)
@@ -93,7 +105,7 @@ class UpdateRepository @Inject constructor(
 
             // Check if user has postponed this version
             val preferences = getUpdatePreferences().first()
-            if (preferences.postponedVersion == latestVersion && 
+            if (preferences.postponedVersion == latestVersion &&
                 System.currentTimeMillis() < preferences.postponedUntil) {
                 return Result.success(null)
             }
