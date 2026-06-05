@@ -101,6 +101,8 @@ class AlarmScheduler @Inject constructor(
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             putExtra("alarm_id", entity.id)
             putExtra("shift", entity.shift)
+            putExtra("snooze_remaining", entity.snoozeCount)
+            putExtra("snooze_interval", entity.snoozeInterval)
         }
         val requestCode = if (entity.id != 0) entity.id else (entity.time + entity.shift).hashCode()
         return PendingIntent.getBroadcast(

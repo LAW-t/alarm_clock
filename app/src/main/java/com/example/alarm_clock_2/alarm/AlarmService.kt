@@ -53,6 +53,7 @@ class AlarmService : Service() {
     // Extras from triggering intent
     private var alarmId: Int = 0
     private var snoozeRemaining: Int = 0
+    private var snoozeIntervalMin: Int = 5
     private var shift: String? = null
 
     @EntryPoint
@@ -110,6 +111,7 @@ class AlarmService : Service() {
         // Cache extras for building notification & pause handling
         alarmId = intent?.getIntExtra("alarm_id", 0) ?: 0
         snoozeRemaining = intent?.getIntExtra("snooze_remaining", 0) ?: 0
+        snoozeIntervalMin = intent?.getIntExtra("snooze_interval", 5) ?: 5
         shift = intent?.getStringExtra("shift")
 
         val notif = buildForegroundNotification()
@@ -302,9 +304,8 @@ class AlarmService : Service() {
         val remaining = intent.getIntExtra("snooze_remaining", 0)
         if (remaining <= 0) return
 
-        // 优先使用传入的自定义贪睡时长，否则使用全局设置
-        val customDelay = intent.getIntExtra("snooze_delay_minutes", -1)
-        val intervalMin = if (customDelay > 0) customDelay
+        // 使用 per-alarm 贪睡间隔（已在 onStartCommand 缓存），fallback 全局设置
+        val intervalMin = if (snoozeIntervalMin > 0) snoozeIntervalMin
             else runBlocking { settings.snoozeIntervalFlow.first() }
         val delayMillis = intervalMin * 60_000L
 
@@ -314,6 +315,7 @@ class AlarmService : Service() {
             putExtra("alarm_id", intent.getIntExtra("alarm_id", 0))
             putExtra("shift", intent.getStringExtra("shift"))
             putExtra("snooze_remaining", remaining - 1)
+            putExtra("snooze_interval", intervalMin)
         }
         val pending = PendingIntent.getBroadcast(
             this,

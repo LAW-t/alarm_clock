@@ -37,23 +37,22 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        val settings: SettingsDataStore = EntryPointAccessors.fromApplication(context, Entry::class.java).settings()
-        val defaultCount = runBlocking { settings.snoozeCountFlow.first() }
-
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         val wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "AlarmClock:WakeLock")
         wakeLock.acquire(10 * 60 * 1000L /* 10 minutes */)
         Log.d("AlarmReceiver", "WakeLock acquired")
 
-        // Start foreground service to play alarm sound in case UI cannot be shown
+        // 直接从 intent 读取 per-alarm 贪睡设置（由 AlarmScheduler 写入）
         val alarmId = intent.getIntExtra("alarm_id", 0)
         val shift = intent.getStringExtra("shift")
-        val remaining = intent.getIntExtra("snooze_remaining", defaultCount)
+        val remaining = intent.getIntExtra("snooze_remaining", 0)
+        val snoozeIntervalMin = intent.getIntExtra("snooze_interval", 5)
 
         val serviceIntent = Intent(context, AlarmService::class.java).apply {
             putExtra("alarm_id", alarmId)
             putExtra("shift", shift)
             putExtra("snooze_remaining", remaining)
+            putExtra("snooze_interval", snoozeIntervalMin)
         }
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             context.startForegroundService(serviceIntent)

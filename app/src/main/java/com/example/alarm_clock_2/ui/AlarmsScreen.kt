@@ -30,7 +30,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +52,17 @@ import androidx.compose.foundation.BorderStroke
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
+    // 固定密度，不受系统显示大小影响
+    val context = LocalContext.current
+    val fixedDensity = remember {
+        val wm = context.getSystemService(android.content.Context.WINDOW_SERVICE) as android.view.WindowManager
+        val metrics = android.util.DisplayMetrics()
+        @Suppress("DEPRECATION")
+        wm.defaultDisplay.getRealMetrics(metrics)
+        Density(metrics.density, fontScale = 1f)
+    }
+    CompositionLocalProvider(LocalDensity provides fixedDensity) {
+
     val alarmsDb = viewModel.alarms.collectAsState().value
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -205,7 +218,7 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
-                        .size(60.dp)
+                        .size(52.dp)
                         .pressClickEffect(),
                     shape = CircleShape,
                     elevation = FloatingActionButtonDefaults.elevation(
@@ -266,9 +279,9 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
-                        .padding(horizontal = 20.dp),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
-                    contentPadding = PaddingValues(vertical = 24.dp)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(vertical = 16.dp)
                 ) {
                     items(items = allAlarms, key = { it.entity.id }) { item ->
                         AlarmItemWithLongPress(
@@ -345,6 +358,8 @@ fun AlarmsScreen(viewModel: AlarmsViewModel = hiltViewModel()) {
             }
         )
     }
+
+    } // CompositionLocalProvider(fixedDensity)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -438,7 +453,7 @@ private fun ModernAlarmCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // 时间和信息区域
@@ -447,7 +462,7 @@ private fun ModernAlarmCard(
                     Text(
                         text = timeDisplay,
                         style = MaterialTheme.typography.displaySmall.copy(
-                            fontSize = 42.sp,
+                            fontSize = 32.sp,
                             fontWeight = if (isEnabled) FontWeight.Medium else FontWeight.Normal
                         ),
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isEnabled) 1f else 0.38f)

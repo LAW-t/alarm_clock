@@ -75,11 +75,9 @@ fun AlarmEditBottomSheet(
         )
     }
 
-    // 初始贪睡状态逻辑：如果是编辑且snoozeCount>0，则开启；如果是新建，默认关闭（即snoozeCount=0）
-    // 或者保持原逻辑：默认开启？通常闹钟默认开启贪睡比较合理，但也看用户习惯。
-    // 这里改为：如果有初始值且>0，则开启。新建时默认为 true (3次, 5分)
+    // 贪睡：编辑时根据已有值决定，新建时默认关闭
     var isSnoozeEnabled by remember(alarm) {
-        mutableStateOf(if (isEditing) alarm!!.snoozeCount > 0 else true)
+        mutableStateOf(if (isEditing) alarm!!.snoozeCount > 0 else false)
     }
 
     var snoozeCount by remember(alarm) {
@@ -159,8 +157,8 @@ fun AlarmEditBottomSheet(
                 imm.hideSoftInputFromWindow(view.windowToken, 0)
             }
 
-            // 时间选择器部分
-            var useDial by remember { mutableStateOf(false) }
+            // 时间选择器部分（默认转盘模式）
+            var useDial by remember { mutableStateOf(true) }
             
             // 切换按钮容器，与时间输入组件对齐
             Box(
