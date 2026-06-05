@@ -158,7 +158,7 @@ fun AlarmEditBottomSheet(
             }
 
             // 时间选择器部分（默认转盘模式）
-            var useDial by remember { mutableStateOf(true) }
+            var useDial by remember { mutableStateOf(false) }
             
             // 切换按钮容器，与时间输入组件对齐
             Box(

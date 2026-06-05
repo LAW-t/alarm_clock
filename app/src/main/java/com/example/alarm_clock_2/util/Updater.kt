@@ -15,10 +15,19 @@ import java.net.URL
 
 object Updater {
     // 主源：Gitee；备用：GitHub
-    private val API_URLS = listOf(
-        "https://gitee.com/api/v5/repos/LAWhome/alarm_clock/releases/latest",
-        "https://api.github.com/repos/LAW-t/alarm_clock/releases/latest"
+    // Gitee 用 /releases?per_page=1 取最新（可能无 /latest 端点）
+    private val API_CONFIGS = listOf(
+        ApiConfig(
+            url = "https://gitee.com/api/v5/repos/LAWhome/alarm_clock/releases?per_page=1&page=1&direction=desc",
+            isArray = true
+        ),
+        ApiConfig(
+            url = "https://api.github.com/repos/LAW-t/alarm_clock/releases/latest",
+            isArray = false
+        )
     )
+
+    private data class ApiConfig(val url: String, val isArray: Boolean)
 
     /** in-memory cache; clears after [CACHE_WINDOW_MS] */
     private var cachedInfo: ReleaseInfo? = null
@@ -33,8 +42,8 @@ object Updater {
             return@withContext cachedInfo
         }
 
-        for (url in API_URLS) {
-            val info = tryFetch(url)
+        for (cfg in API_CONFIGS) {
+            val info = tryFetch(cfg)
             if (info != null) {
                 cachedInfo = info
                 lastFetch = now
@@ -44,16 +53,23 @@ object Updater {
         null
     }
 
-    private fun tryFetch(apiUrl: String): ReleaseInfo? {
+    private fun tryFetch(cfg: ApiConfig): ReleaseInfo? {
         return try {
-            val conn = URL(apiUrl).openConnection() as java.net.HttpURLConnection
+            val conn = URL(cfg.url).openConnection() as java.net.HttpURLConnection
             conn.setRequestProperty("Accept", "application/json")
             conn.setRequestProperty("User-Agent", "alarm-clock-app")
             conn.connectTimeout = 5000
             conn.readTimeout = 5000
             if (conn.responseCode != 200) return null
             val json = conn.inputStream.bufferedReader().use { it.readText() }
-            val obj = JSONObject(json)
+            // 兼容数组和单对象两种响应格式
+            val obj = if (cfg.isArray) {
+                val arr = org.json.JSONArray(json)
+                if (arr.length() == 0) return null
+                arr.getJSONObject(0)
+            } else {
+                JSONObject(json)
+            }
             val version = obj.getString("tag_name")
             val assets = obj.getJSONArray("assets")
             var apkUrl = ""
@@ -67,6 +83,7 @@ object Updater {
             }
             if (apkUrl.isBlank()) null else ReleaseInfo(version, apkUrl)
         } catch (e: Exception) {
+            android.util.Log.w("Updater", "fetch failed: ${cfg.url}", e)
             null
         }
     }

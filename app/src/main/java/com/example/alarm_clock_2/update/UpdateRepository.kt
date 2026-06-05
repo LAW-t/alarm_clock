@@ -48,11 +48,15 @@ class UpdateRepository @Inject constructor(
     private val AUTO_CHECK_ENABLED = booleanPreferencesKey("auto_check_enabled")
     private val WIFI_ONLY_DOWNLOAD = booleanPreferencesKey("wifi_only_download")
 
+    // 单条 API 配置：url + 响应是否为数组
+    private data class ApiConfig(val url: String, val isArray: Boolean)
+
     companion object {
         // 主源：Gitee；备用：GitHub
-        private val API_URLS = listOf(
-            "https://gitee.com/api/v5/repos/LAWhome/alarm_clock/releases/latest",
-            "https://api.github.com/repos/LAW-t/alarm_clock/releases/latest"
+        // Gitee 用 ?per_page=1 取最新（可能无 /latest 端点）
+        private val API_CONFIGS = listOf(
+            ApiConfig("https://gitee.com/api/v5/repos/LAWhome/alarm_clock/releases?per_page=1&page=1&direction=desc", true),
+            ApiConfig("https://api.github.com/repos/LAW-t/alarm_clock/releases/latest", false)
         )
         private const val APK_FILE_NAME = "alarm_clock_update.apk"
         private const val POSTPONE_DURATION_HOURS = 24L // Postpone for 24 hours
@@ -62,17 +66,17 @@ class UpdateRepository @Inject constructor(
      * 检查更新：Gitee 优先，GitHub 备用
      */
     suspend fun checkForUpdates(currentVersion: String): Result<UpdateInfo?> {
-        for (url in API_URLS) {
-            val result = tryFetchRelease(url, currentVersion)
+        for (cfg in API_CONFIGS) {
+            val result = tryFetchRelease(cfg, currentVersion)
             if (result.isSuccess && result.getOrNull() != null) return result
         }
         return Result.success(null)
     }
 
-    private suspend fun tryFetchRelease(apiUrl: String, currentVersion: String): Result<UpdateInfo?> {
+    private suspend fun tryFetchRelease(cfg: ApiConfig, currentVersion: String): Result<UpdateInfo?> {
         return try {
             val request = Request.Builder()
-                .url(apiUrl)
+                .url(cfg.url)
                 .addHeader("Accept", "application/json")
                 .build()
 
@@ -85,7 +89,13 @@ class UpdateRepository @Inject constructor(
             val responseBody = response.body?.string()
                 ?: return Result.failure(Exception("Empty response body"))
 
-            val release = json.decodeFromString<GitHubRelease>(responseBody)
+            // 兼容数组和单对象两种响应格式
+            val release = if (cfg.isArray) {
+                val list = json.decodeFromString<List<GitHubRelease>>(responseBody)
+                list.firstOrNull() ?: return Result.success(null)
+            } else {
+                json.decodeFromString<GitHubRelease>(responseBody)
+            }
 
             // Skip pre-release versions
             if (release.prerelease) {
